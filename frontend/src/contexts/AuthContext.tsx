@@ -89,10 +89,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signInWithGitHub = useCallback(async () => {
     try {
       setError(null)
+      const redirectTo = `${window.location.origin}/auth/callback`
+      console.log('Initiating GitHub OAuth with redirect:', redirectTo)
+      console.log('Full OAuth URL will redirect to Supabase, then back to:', redirectTo)
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         }
       })
 
