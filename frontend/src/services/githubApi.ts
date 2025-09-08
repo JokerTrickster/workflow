@@ -25,7 +25,7 @@ export class GitHubApiService {
       return null;
     }
 
-    return session.provider_token;
+    return session.provider_token ?? null;
   }
 
   private static async sleep(ms: number): Promise<void> {
