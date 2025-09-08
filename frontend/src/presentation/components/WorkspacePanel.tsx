@@ -126,10 +126,10 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-background z-50 flex flex-col">
+    <div className="fixed inset-0 bg-background z-50 flex flex-col safe-area-inset">
       {/* Header */}
       <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto max-w-7xl px-4 py-4 px-safe-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -148,7 +148,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 container mx-auto px-4 py-6">
+      <div className="flex-1 container mx-auto max-w-7xl px-4 py-6 px-safe-4">
         <Tabs defaultValue="tasks" className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="repo">Repository</TabsTrigger>
