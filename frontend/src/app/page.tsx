@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { RepositoryCard } from '../presentation/components/RepositoryCard';
 import { WorkspacePanel } from '../presentation/components/WorkspacePanel';
 import { Button } from '../components/ui/button';
