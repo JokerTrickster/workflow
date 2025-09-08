@@ -203,9 +203,10 @@ export function SearchFilter({ filters, onFiltersChange, repositories }: SearchF
             Search: {filters.query}
             <button
               onClick={() => handleQueryChange('')}
-              className="hover:bg-muted-foreground/20 rounded-full p-0.5"
+              className="hover:bg-muted-foreground/20 rounded-full p-1 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
+              aria-label="Clear search"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </button>
           </Badge>
         )}
@@ -215,9 +216,10 @@ export function SearchFilter({ filters, onFiltersChange, repositories }: SearchF
             {filters.language}
             <button
               onClick={() => handleLanguageChange('all')}
-              className="hover:bg-muted-foreground/20 rounded-full p-0.5"
+              className="hover:bg-muted-foreground/20 rounded-full p-1 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
+              aria-label="Clear language filter"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </button>
           </Badge>
         )}
@@ -227,9 +229,10 @@ export function SearchFilter({ filters, onFiltersChange, repositories }: SearchF
             {filters.visibility}
             <button
               onClick={() => handleVisibilityChange('all')}
-              className="hover:bg-muted-foreground/20 rounded-full p-0.5"
+              className="hover:bg-muted-foreground/20 rounded-full p-1 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
+              aria-label="Clear visibility filter"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </button>
           </Badge>
         )}
@@ -239,9 +242,10 @@ export function SearchFilter({ filters, onFiltersChange, repositories }: SearchF
             {filters.connected}
             <button
               onClick={() => handleConnectedChange('all')}
-              className="hover:bg-muted-foreground/20 rounded-full p-0.5"
+              className="hover:bg-muted-foreground/20 rounded-full p-1 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
+              aria-label="Clear connection status filter"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </button>
           </Badge>
         )}

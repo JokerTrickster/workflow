@@ -259,7 +259,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto max-w-7xl px-4 py-8">
           <Card className="max-w-md mx-auto">
             <CardContent className="pt-6 text-center space-y-4">
               <div className="text-destructive">
@@ -283,7 +283,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto max-w-7xl px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Github className="h-8 w-8" />
@@ -308,7 +308,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto max-w-7xl px-4 py-8">
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
