@@ -4,15 +4,16 @@ import { Repository } from '../../domain/entities/Repository';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { Star, GitFork, Calendar, ExternalLink } from 'lucide-react';
+import { Star, GitFork, Calendar, ExternalLink, Unplug } from 'lucide-react';
 
 interface RepositoryCardProps {
   repository: Repository;
   onConnect: (repoId: number) => void;
+  onDisconnect: (repoId: number) => void;
   onOpenWorkspace: (repository: Repository) => void;
 }
 
-export function RepositoryCard({ repository, onConnect, onOpenWorkspace }: RepositoryCardProps) {
+export function RepositoryCard({ repository, onConnect, onDisconnect, onOpenWorkspace }: RepositoryCardProps) {
   return (
     <Card className="w-full">
       <CardHeader>
@@ -69,15 +70,26 @@ export function RepositoryCard({ repository, onConnect, onOpenWorkspace }: Repos
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           {repository.is_connected ? (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => onOpenWorkspace(repository)}
-            >
-              Open Workspace
-            </Button>
+            <>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => onOpenWorkspace(repository)}
+              >
+                Open Workspace
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => onDisconnect(repository.id)}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Unplug className="h-4 w-4 mr-1" />
+                Disconnect
+              </Button>
+            </>
           ) : (
             <Button 
               size="sm" 
