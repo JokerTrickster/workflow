@@ -1,97 +1,15 @@
 import { supabase } from '@/lib/supabase/client';
 import { Repository } from '@/domain/entities/Repository';
-
-interface GitHubRepo {
-  id: number;
-  name: string;
-  full_name: string;
-  description: string | null;
-  html_url: string;
-  clone_url: string;
-  ssh_url: string;
-  private: boolean;
-  language: string | null;
-  stargazers_count: number;
-  forks_count: number;
-  created_at: string;
-  updated_at: string;
-  pushed_at: string;
-  default_branch: string;
-}
-
-interface GitHubApiResponse {
-  repositories: Repository[];
-  nextCursor?: number;
-  hasMore: boolean;
-}
-
-// Temporary generic types - Stream B will provide specific interfaces
-interface GitHubIssue {
-  id: number;
-  number: number;
-  title: string;
-  body: string | null;
-  state: 'open' | 'closed';
-  created_at: string;
-  updated_at: string;
-  closed_at: string | null;
-  html_url: string;
-  user: {
-    id: number;
-    login: string;
-    avatar_url: string;
-  };
-  labels: Array<{
-    id: number;
-    name: string;
-    color: string;
-  }>;
-  assignees: Array<{
-    id: number;
-    login: string;
-    avatar_url: string;
-  }>;
-}
-
-interface GitHubPullRequest {
-  id: number;
-  number: number;
-  title: string;
-  body: string | null;
-  state: 'open' | 'closed' | 'merged';
-  created_at: string;
-  updated_at: string;
-  closed_at: string | null;
-  merged_at: string | null;
-  html_url: string;
-  user: {
-    id: number;
-    login: string;
-    avatar_url: string;
-  };
-  head: {
-    ref: string;
-    sha: string;
-  };
-  base: {
-    ref: string;
-    sha: string;
-  };
-  mergeable: boolean | null;
-  draft: boolean;
-}
-
-interface GitHubIssuesResponse {
-  issues: GitHubIssue[];
-  nextCursor?: number;
-  hasMore: boolean;
-}
-
-interface GitHubPullRequestsResponse {
-  pullRequests: GitHubPullRequest[];
-  nextCursor?: number;
-  hasMore: boolean;
-}
+import {
+  GitHubRepo,
+  GitHubApiResponse,
+  GitHubIssue,
+  GitHubPullRequest,
+  GitHubIssuesResponse,
+  GitHubPullRequestsResponse,
+  GitHubIssuesRequestParams,
+  GitHubPullRequestsRequestParams
+} from '@/types/github';
 
 export class GitHubApiService {
   private static async getAccessToken(): Promise<string | null> {
@@ -112,6 +30,24 @@ export class GitHubApiService {
 
   private static async sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private static parseLinkHeader(linkHeader: string): { first?: string; prev?: string; next?: string; last?: string } {
+    const links: { first?: string; prev?: string; next?: string; last?: string } = {};
+    
+    // Parse Link header format: <url1>; rel="next", <url2>; rel="last"
+    const parts = linkHeader.split(',');
+    for (const part of parts) {
+      const match = part.match(/<([^>]+)>;\s*rel="([^"]+)"/);
+      if (match) {
+        const [, url, rel] = match;
+        if (rel === 'first' || rel === 'prev' || rel === 'next' || rel === 'last') {
+          links[rel] = url;
+        }
+      }
+    }
+    
+    return links;
   }
 
   private static async makeApiRequest(url: string, accessToken: string, retries = 3): Promise<Response> {
@@ -245,16 +181,21 @@ export class GitHubApiService {
   /**
    * Fetch issues for a specific repository
    * @param repoId - Repository ID (format: "owner/repo" e.g., "facebook/react")
-   * @param page - Page number for pagination (default: 1)
-   * @param perPage - Number of items per page (default: 30, max: 100)
-   * @param state - Issue state filter: 'open', 'closed', or 'all' (default: 'open')
+   * @param params - Optional parameters for filtering and pagination
    */
   static async fetchRepositoryIssues(
     repoId: string, 
-    page = 1, 
-    perPage = 30,
-    state: 'open' | 'closed' | 'all' = 'open'
+    params: Partial<GitHubIssuesRequestParams> = {}
   ): Promise<GitHubIssuesResponse> {
+    // Set defaults
+    const {
+      page = 1,
+      per_page = 30,
+      state = 'open',
+      sort = 'updated',
+      direction = 'desc',
+      ...otherParams
+    } = params;
     const accessToken = await this.getAccessToken();
     
     if (!accessToken) {
@@ -267,7 +208,22 @@ export class GitHubApiService {
     }
 
     try {
-      const url = `https://api.github.com/repos/${repoId}/issues?page=${page}&per_page=${perPage}&state=${state}&sort=updated`;
+      // Build query parameters
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        per_page: per_page.toString(),
+        state,
+        sort,
+        direction,
+        ...Object.fromEntries(
+          Object.entries(otherParams).map(([key, value]) => [
+            key, 
+            Array.isArray(value) ? value.join(',') : String(value)
+          ])
+        )
+      });
+
+      const url = `https://api.github.com/repos/${repoId}/issues?${queryParams}`;
       const response = await this.makeApiRequest(url, accessToken);
 
       const issues: GitHubIssue[] = await response.json();
@@ -275,14 +231,23 @@ export class GitHubApiService {
       // Filter out pull requests (GitHub API returns PRs as issues)
       const filteredIssues = issues.filter(issue => !issue.html_url.includes('/pull/'));
 
-      // Check if there are more pages by looking at the Link header
+      // Parse pagination metadata from headers
       const linkHeader = response.headers.get('Link');
       const hasNext = linkHeader?.includes('rel="next"') || false;
+      const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining');
+      const rateLimitReset = response.headers.get('X-RateLimit-Reset');
 
       return {
         issues: filteredIssues,
         nextCursor: hasNext ? page + 1 : undefined,
-        hasMore: hasNext
+        hasMore: hasNext,
+        pagination: {
+          page,
+          per_page,
+          has_next_page: hasNext,
+          has_previous_page: page > 1
+        },
+        links: linkHeader ? this.parseLinkHeader(linkHeader) : undefined
       };
     } catch (error) {
       console.error(`Failed to fetch issues for repository ${repoId}:`, error);
@@ -293,16 +258,21 @@ export class GitHubApiService {
   /**
    * Fetch pull requests for a specific repository
    * @param repoId - Repository ID (format: "owner/repo" e.g., "facebook/react")
-   * @param page - Page number for pagination (default: 1)
-   * @param perPage - Number of items per page (default: 30, max: 100)
-   * @param state - PR state filter: 'open', 'closed', or 'all' (default: 'open')
+   * @param params - Optional parameters for filtering and pagination
    */
   static async fetchRepositoryPullRequests(
     repoId: string, 
-    page = 1, 
-    perPage = 30,
-    state: 'open' | 'closed' | 'all' = 'open'
+    params: Partial<GitHubPullRequestsRequestParams> = {}
   ): Promise<GitHubPullRequestsResponse> {
+    // Set defaults
+    const {
+      page = 1,
+      per_page = 30,
+      state = 'open',
+      sort = 'updated',
+      direction = 'desc',
+      ...otherParams
+    } = params;
     const accessToken = await this.getAccessToken();
     
     if (!accessToken) {
@@ -315,19 +285,43 @@ export class GitHubApiService {
     }
 
     try {
-      const url = `https://api.github.com/repos/${repoId}/pulls?page=${page}&per_page=${perPage}&state=${state}&sort=updated`;
+      // Build query parameters
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        per_page: per_page.toString(),
+        state,
+        sort,
+        direction,
+        ...Object.fromEntries(
+          Object.entries(otherParams).map(([key, value]) => [
+            key, 
+            Array.isArray(value) ? value.join(',') : String(value)
+          ])
+        )
+      });
+
+      const url = `https://api.github.com/repos/${repoId}/pulls?${queryParams}`;
       const response = await this.makeApiRequest(url, accessToken);
 
       const pullRequests: GitHubPullRequest[] = await response.json();
 
-      // Check if there are more pages by looking at the Link header
+      // Parse pagination metadata from headers
       const linkHeader = response.headers.get('Link');
       const hasNext = linkHeader?.includes('rel="next"') || false;
+      const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining');
+      const rateLimitReset = response.headers.get('X-RateLimit-Reset');
 
       return {
         pullRequests,
         nextCursor: hasNext ? page + 1 : undefined,
-        hasMore: hasNext
+        hasMore: hasNext,
+        pagination: {
+          page,
+          per_page,
+          has_next_page: hasNext,
+          has_previous_page: page > 1
+        },
+        links: linkHeader ? this.parseLinkHeader(linkHeader) : undefined
       };
     } catch (error) {
       console.error(`Failed to fetch pull requests for repository ${repoId}:`, error);
