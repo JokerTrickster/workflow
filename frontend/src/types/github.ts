@@ -357,22 +357,32 @@ export interface GitHubSearchIssuesResponse {
 export function isGitHubIssue(item: unknown): item is GitHubIssue {
   return typeof item === 'object' && 
          item !== null && 
-         typeof item.id === 'number' && 
-         typeof item.number === 'number' && 
-         typeof item.title === 'string' && 
-         typeof item.state === 'string' &&
-         !item.pull_request; // Issues don't have pull_request property
+         'id' in item &&
+         'number' in item &&
+         'title' in item &&
+         'state' in item &&
+         typeof (item as GitHubIssue).id === 'number' && 
+         typeof (item as GitHubIssue).number === 'number' && 
+         typeof (item as GitHubIssue).title === 'string' && 
+         typeof (item as GitHubIssue).state === 'string' &&
+         !('pull_request' in item); // Issues don't have pull_request property
 }
 
 export function isGitHubPullRequest(item: unknown): item is GitHubPullRequest {
   return typeof item === 'object' && 
          item !== null && 
-         typeof item.id === 'number' && 
-         typeof item.number === 'number' && 
-         typeof item.title === 'string' && 
-         typeof item.state === 'string' &&
-         typeof item.head === 'object' &&
-         typeof item.base === 'object';
+         'id' in item &&
+         'number' in item &&
+         'title' in item &&
+         'state' in item &&
+         'head' in item &&
+         'base' in item &&
+         typeof (item as GitHubPullRequest).id === 'number' && 
+         typeof (item as GitHubPullRequest).number === 'number' && 
+         typeof (item as GitHubPullRequest).title === 'string' && 
+         typeof (item as GitHubPullRequest).state === 'string' &&
+         typeof (item as GitHubPullRequest).head === 'object' &&
+         typeof (item as GitHubPullRequest).base === 'object';
 }
 
 // Repository-related types (simplified for this context)
@@ -400,24 +410,3 @@ export interface GitHubApiResponse<T = unknown> {
   hasMore: boolean;
 }
 
-// Export all commonly used types for convenience
-export type {
-  GitHubUser,
-  GitHubLabel,
-  GitHubMilestone,
-  GitHubReactions,
-  GitHubIssue,
-  GitHubPullRequest,
-  GitHubRepository,
-  GitHubGitRef,
-  GitHubIssuesResponse,
-  GitHubPullRequestsResponse,
-  GitHubIssuesRequestParams,
-  GitHubPullRequestsRequestParams,
-  GitHubApiError,
-  GitHubRateLimit,
-  GitHubPaginationMeta,
-  GitHubPaginationLinks,
-  GitHubSearchIssuesParams,
-  GitHubSearchIssuesResponse
-};
