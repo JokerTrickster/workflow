@@ -24,7 +24,19 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
-  Users
+  Users,
+  Tag,
+  MessageCircle,
+  GitMerge,
+  Eye,
+  Link,
+  Filter,
+  User,
+  UserCheck,
+  UserMinus,
+  GitCommit,
+  ChevronDown,
+  Star
 } from 'lucide-react';
 import {
   Dialog,
@@ -95,6 +107,12 @@ export function TaskTab({ repository }: TaskTabProps) {
   const [prsFilter, setPrsFilter] = useState<'all' | 'open' | 'closed'>('open');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubTab, setActiveSubTab] = useState('tasks');
+  
+  // Enhanced filtering state
+  const [labelFilter, setLabelFilter] = useState<string>('');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('');
+  const [linkedTasksFilter, setLinkedTasksFilter] = useState<'all' | 'linked' | 'unlinked'>('all');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // GitHub API calls
   const repoId = repository.full_name;
@@ -203,55 +221,162 @@ export function TaskTab({ repository }: TaskTabProps) {
     }
   };
 
-  const getIssueStateBadge = (state: string) => {
-    return state === 'open' ? (
-      <Badge className="bg-green-100 text-green-800">
-        <AlertCircle className="h-3 w-3 mr-1" />
-        Open
-      </Badge>
-    ) : (
-      <Badge className="bg-purple-100 text-purple-800">
+  const getIssueStateBadge = (state: string, stateReason?: string) => {
+    if (state === 'open') {
+      return (
+        <Badge className="bg-green-100 text-green-800 border-green-300">
+          <AlertCircle className="h-3 w-3 mr-1" />
+          Open
+        </Badge>
+      );
+    }
+    
+    const isCompleted = stateReason === 'completed';
+    return (
+      <Badge className={isCompleted ? "bg-purple-100 text-purple-800 border-purple-300" : "bg-gray-100 text-gray-800 border-gray-300"}>
         <CheckCircle className="h-3 w-3 mr-1" />
-        Closed
+        {isCompleted ? 'Completed' : 'Closed'}
       </Badge>
     );
   };
 
-  const getPRStateBadge = (state: string, merged: boolean) => {
+  const getPRStateBadge = (state: string, merged: boolean, draft?: boolean) => {
     if (merged) {
       return (
-        <Badge className="bg-purple-100 text-purple-800">
-          <GitPullRequest className="h-3 w-3 mr-1" />
+        <Badge className="bg-purple-100 text-purple-800 border-purple-300">
+          <GitMerge className="h-3 w-3 mr-1" />
           Merged
         </Badge>
       );
     }
     
+    if (draft && state === 'open') {
+      return (
+        <Badge className="bg-gray-100 text-gray-700 border-gray-300">
+          <GitCommit className="h-3 w-3 mr-1" />
+          Draft
+        </Badge>
+      );
+    }
+    
     return state === 'open' ? (
-      <Badge className="bg-green-100 text-green-800">
+      <Badge className="bg-green-100 text-green-800 border-green-300">
         <GitPullRequest className="h-3 w-3 mr-1" />
         Open
       </Badge>
     ) : (
-      <Badge className="bg-red-100 text-red-800">
+      <Badge className="bg-red-100 text-red-800 border-red-300">
         <GitPullRequest className="h-3 w-3 mr-1" />
         Closed
       </Badge>
     );
   };
 
-  // Filter functions
-  const filteredIssues = issuesData?.issues?.filter(issue =>
-    searchTerm === '' || 
-    issue.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    issue.body?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  // Helper function to check if GitHub item has linked tasks
+  const getLinkedTaskCount = (item: GitHubIssue | GitHubPullRequest): number => {
+    // For now, check if any local task references this GitHub item
+    // In the future, this could be enhanced with a proper database lookup
+    return tasks.filter(task => {
+      if ('pull_request' in item) {
+        // This is actually an issue, but TypeScript guard isn't working properly
+        return false;
+      }
+      const pr = item as GitHubPullRequest;
+      const issue = item as GitHubIssue;
+      
+      // Check if task was created from this GitHub item
+      return task.pr_url === (pr.html_url || issue.html_url) ||
+        task.description?.includes((pr.html_url || issue.html_url) || '') ||
+        task.title.includes(`#${item.number}`);
+    }).length;
+  };
 
-  const filteredPRs = prsData?.pullRequests?.filter(pr =>
-    searchTerm === '' || 
-    pr.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    pr.body?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  // Get unique labels from current data for filter dropdown
+  const getAvailableLabels = (type: 'issues' | 'prs') => {
+    const items = type === 'issues' ? (issuesData?.issues || []) : (prsData?.pullRequests || []);
+    const allLabels = items.flatMap(item => item.labels);
+    const uniqueLabels = Array.from(new Set(allLabels.map(label => label.name)))
+      .map(name => allLabels.find(label => label.name === name)!)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return uniqueLabels;
+  };
+
+  // Get unique assignees/reviewers from current data
+  const getAvailableAssignees = (type: 'issues' | 'prs') => {
+    const items = type === 'issues' ? (issuesData?.issues || []) : (prsData?.pullRequests || []);
+    const allUsers = items.flatMap(item => {
+      const users = [...item.assignees];
+      if (item.assignee) users.push(item.assignee);
+      if ('requested_reviewers' in item) {
+        users.push(...(item as GitHubPullRequest).requested_reviewers);
+      }
+      return users;
+    });
+    const uniqueUsers = Array.from(new Set(allUsers.map(user => user.login)))
+      .map(login => allUsers.find(user => user.login === login)!)
+      .sort((a, b) => a.login.localeCompare(b.login));
+    return uniqueUsers;
+  };
+
+  // Reset filters
+  const resetFilters = () => {
+    setSearchTerm('');
+    setLabelFilter('');
+    setAssigneeFilter('');
+    setLinkedTasksFilter('all');
+  };
+
+  // Enhanced filter functions
+  const filteredIssues = issuesData?.issues?.filter(issue => {
+    // Search filter
+    const matchesSearch = searchTerm === '' || 
+      issue.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      issue.body?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      issue.user.login.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Label filter
+    const matchesLabel = labelFilter === '' || 
+      issue.labels.some(label => label.name.toLowerCase().includes(labelFilter.toLowerCase()));
+    
+    // Assignee filter
+    const matchesAssignee = assigneeFilter === '' ||
+      issue.assignees.some(assignee => assignee.login.toLowerCase().includes(assigneeFilter.toLowerCase())) ||
+      (issue.assignee && issue.assignee.login.toLowerCase().includes(assigneeFilter.toLowerCase()));
+    
+    // Task linkage filter (for future implementation - currently shows all)
+    const matchesLinkage = linkedTasksFilter === 'all' ||
+      (linkedTasksFilter === 'linked' && getLinkedTaskCount(issue) > 0) ||
+      (linkedTasksFilter === 'unlinked' && getLinkedTaskCount(issue) === 0);
+    
+    return matchesSearch && matchesLabel && matchesAssignee && matchesLinkage;
+  }) || [];
+
+  const filteredPRs = prsData?.pullRequests?.filter(pr => {
+    // Search filter
+    const matchesSearch = searchTerm === '' || 
+      pr.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pr.body?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pr.user.login.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pr.head.ref.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pr.base.ref.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Label filter
+    const matchesLabel = labelFilter === '' || 
+      pr.labels.some(label => label.name.toLowerCase().includes(labelFilter.toLowerCase()));
+    
+    // Assignee/Reviewer filter
+    const matchesAssignee = assigneeFilter === '' ||
+      pr.assignees.some(assignee => assignee.login.toLowerCase().includes(assigneeFilter.toLowerCase())) ||
+      pr.requested_reviewers.some(reviewer => reviewer.login.toLowerCase().includes(assigneeFilter.toLowerCase())) ||
+      (pr.assignee && pr.assignee.login.toLowerCase().includes(assigneeFilter.toLowerCase()));
+    
+    // Task linkage filter (for future implementation - currently shows all)
+    const matchesLinkage = linkedTasksFilter === 'all' ||
+      (linkedTasksFilter === 'linked' && getLinkedTaskCount(pr) > 0) ||
+      (linkedTasksFilter === 'unlinked' && getLinkedTaskCount(pr) === 0);
+    
+    return matchesSearch && matchesLabel && matchesAssignee && matchesLinkage;
+  }) || [];
 
   // Render functions for each tab
   const renderTasks = () => (
@@ -393,26 +518,146 @@ export function TaskTab({ repository }: TaskTabProps) {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
-            <Input
-              placeholder={`Search ${type}...`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
+              <Input
+                placeholder={`Search ${type === 'issues' ? 'issues, authors, content' : 'PRs, branches, authors, content'}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-full sm:w-[140px]">
+                <SelectValue placeholder="State" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All States</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="closed">{type === 'prs' ? 'Closed/Merged' : 'Closed'}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="w-full sm:w-auto"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filters
+              <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+            </Button>
           </div>
-          <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Filter by state" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="open">Open</SelectItem>
-              <SelectItem value="closed">{type === 'prs' ? 'Closed/Merged' : 'Closed'}</SelectItem>
-            </SelectContent>
-          </Select>
+
+          {/* Advanced Filters */}
+          {showAdvancedFilters && (
+            <div className="p-4 border rounded-lg bg-muted/30 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Label Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Tag className="h-3 w-3" />
+                    Label
+                  </label>
+                  <Select value={labelFilter} onValueChange={setLabelFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any label" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-48">
+                      <SelectItem value="">Any label</SelectItem>
+                      {getAvailableLabels(type).map(label => (
+                        <SelectItem key={label.id} value={label.name}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-sm" 
+                              style={{ backgroundColor: `#${label.color}` }}
+                            />
+                            {label.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Assignee/Reviewer Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <User className="h-3 w-3" />
+                    {type === 'prs' ? 'Assignee/Reviewer' : 'Assignee'}
+                  </label>
+                  <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Anyone" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-48">
+                      <SelectItem value="">Anyone</SelectItem>
+                      {getAvailableAssignees(type).map(user => (
+                        <SelectItem key={user.id} value={user.login}>
+                          <div className="flex items-center gap-2">
+                            <img 
+                              src={user.avatar_url} 
+                              alt={user.login}
+                              className="w-4 h-4 rounded-full"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            {user.login}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Task Linkage Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Link className="h-3 w-3" />
+                    Task Status
+                  </label>
+                  <Select value={linkedTasksFilter} onValueChange={(value) => setLinkedTasksFilter(value as 'all' | 'linked' | 'unlinked')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All items" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All items</SelectItem>
+                      <SelectItem value="linked">
+                        <div className="flex items-center gap-2">
+                          <Link className="h-3 w-3 text-green-600" />
+                          Has linked tasks
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="unlinked">
+                        <div className="flex items-center gap-2">
+                          <XCircle className="h-3 w-3 text-gray-400" />
+                          No linked tasks
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Filter Actions */}
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="text-xs text-muted-foreground">
+                  Showing {type === 'issues' ? filteredIssues.length : filteredPRs.length} of {type === 'issues' ? (issuesData?.issues?.length || 0) : (prsData?.pullRequests?.length || 0)} {type}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="text-xs"
+                >
+                  Clear all filters
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -473,49 +718,167 @@ export function TaskTab({ repository }: TaskTabProps) {
                             <ExternalLink className="h-3 w-3 opacity-50" />
                           </a>
                         </CardTitle>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {issue && getIssueStateBadge(issue.state)}
-                          {pr && getPRStateBadge(pr.state, pr.merged)}
-                          {pr && (
-                            <Badge variant="outline" className="text-xs">
-                              <GitBranch className="h-3 w-3 mr-1" />
-                              {pr.head.ref} → {pr.base.ref}
-                            </Badge>
+                        <div className="space-y-2">
+                          {/* Primary badges */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {issue && getIssueStateBadge(issue.state, issue.state_reason || undefined)}
+                            {pr && getPRStateBadge(pr.state, pr.merged, pr.draft)}
+                            
+                            {/* Task linkage indicator */}
+                            {getLinkedTaskCount(item) > 0 && (
+                              <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                                <Link className="h-3 w-3 mr-1" />
+                                {getLinkedTaskCount(item)} task{getLinkedTaskCount(item) > 1 ? 's' : ''}
+                              </Badge>
+                            )}
+                            
+                            {/* Branch info for PRs */}
+                            {pr && (
+                              <Badge variant="outline" className="text-xs">
+                                <GitBranch className="h-3 w-3 mr-1" />
+                                {pr.head.ref} → {pr.base.ref}
+                              </Badge>
+                            )}
+                          </div>
+
+                          {/* Secondary info */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {/* Assignees with avatars */}
+                            {item.assignees.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Badge variant="outline" className="text-xs px-2 py-1">
+                                  <UserCheck className="h-3 w-3 mr-1" />
+                                  <div className="flex items-center gap-1">
+                                    <span>{item.assignees.length} assigned</span>
+                                    <div className="flex -space-x-1">
+                                      {item.assignees.slice(0, 3).map((assignee, idx) => (
+                                        <img
+                                          key={assignee.id}
+                                          src={assignee.avatar_url}
+                                          alt={assignee.login}
+                                          title={assignee.login}
+                                          className="w-4 h-4 rounded-full border border-white"
+                                          style={{ zIndex: 10 - idx }}
+                                          onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                          }}
+                                        />
+                                      ))}
+                                      {item.assignees.length > 3 && (
+                                        <div className="w-4 h-4 rounded-full bg-gray-100 border border-white flex items-center justify-center text-xs text-gray-600">
+                                          +{item.assignees.length - 3}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </Badge>
+                              </div>
+                            )}
+
+                            {/* Reviewers for PRs */}
+                            {pr && pr.requested_reviewers.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Badge variant="outline" className="text-xs px-2 py-1">
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  <div className="flex items-center gap-1">
+                                    <span>{pr.requested_reviewers.length} reviewer{pr.requested_reviewers.length > 1 ? 's' : ''}</span>
+                                    <div className="flex -space-x-1">
+                                      {pr.requested_reviewers.slice(0, 3).map((reviewer, idx) => (
+                                        <img
+                                          key={reviewer.id}
+                                          src={reviewer.avatar_url}
+                                          alt={reviewer.login}
+                                          title={reviewer.login}
+                                          className="w-4 h-4 rounded-full border border-white"
+                                          style={{ zIndex: 10 - idx }}
+                                          onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                          }}
+                                        />
+                                      ))}
+                                      {pr.requested_reviewers.length > 3 && (
+                                        <div className="w-4 h-4 rounded-full bg-gray-100 border border-white flex items-center justify-center text-xs text-gray-600">
+                                          +{pr.requested_reviewers.length - 3}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </Badge>
+                              </div>
+                            )}
+
+                            {/* PR specific indicators */}
+                            {pr && pr.draft && (
+                              <Badge variant="outline" className="text-xs">
+                                <GitCommit className="h-3 w-3 mr-1" />
+                                Draft
+                              </Badge>
+                            )}
+
+                            {/* Comments indicator */}
+                            {item.comments > 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                <MessageCircle className="h-3 w-3 mr-1" />
+                                {item.comments}
+                              </Badge>
+                            )}
+                          </div>
+
+                          {/* Labels */}
+                          {item.labels.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1">
+                              {item.labels.slice(0, 4).map(label => (
+                                <Badge 
+                                  key={label.id} 
+                                  variant="outline" 
+                                  className="text-xs px-2 py-0.5"
+                                  style={{ 
+                                    backgroundColor: `#${label.color}15`,
+                                    borderColor: `#${label.color}`,
+                                    color: `#${label.color}`
+                                  }}
+                                >
+                                  <Tag className="h-2.5 w-2.5 mr-1" />
+                                  {label.name}
+                                </Badge>
+                              ))}
+                              {item.labels.length > 4 && (
+                                <Badge variant="outline" className="text-xs px-2 py-0.5">
+                                  +{item.labels.length - 4} more
+                                </Badge>
+                              )}
+                            </div>
                           )}
-                          {item.assignees.length > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              <Users className="h-3 w-3 mr-1" />
-                              {item.assignees.length} assigned
-                            </Badge>
-                          )}
-                          {item.labels.map(label => (
-                            <Badge 
-                              key={label.id} 
-                              variant="outline" 
-                              className="text-xs"
-                              style={{ 
-                                backgroundColor: `#${label.color}20`,
-                                borderColor: `#${label.color}`,
-                                color: `#${label.color}`
-                              }}
-                            >
-                              {label.name}
-                            </Badge>
-                          ))}
                         </div>
                       </div>
                       <div className="flex gap-2 shrink-0">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            if (issue) handleCreateTaskFromIssue(issue);
-                            if (pr) handleCreateTaskFromPR(pr);
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Create Task
-                        </Button>
+                        {/* Create Task Button - Enhanced with context */}
+                        {getLinkedTaskCount(item) > 0 ? (
+                          <Button 
+                            variant="secondary" 
+                            size="sm"
+                            onClick={() => {
+                              if (issue) handleCreateTaskFromIssue(issue);
+                              if (pr) handleCreateTaskFromPR(pr);
+                            }}
+                            className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Another Task
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              if (issue) handleCreateTaskFromIssue(issue);
+                              if (pr) handleCreateTaskFromPR(pr);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Task
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
@@ -524,16 +887,49 @@ export function TaskTab({ repository }: TaskTabProps) {
                       <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                         {item.body}
                       </p>
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(item.created_at).toLocaleDateString()}
+                      <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-4">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Created {new Date(item.created_at).toLocaleDateString()}
+                          </div>
+                          {item.updated_at !== item.created_at && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Updated {new Date(item.updated_at).toLocaleDateString()}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <img 
+                              src={item.user.avatar_url} 
+                              alt={item.user.login}
+                              className="w-3 h-3 rounded-full"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            by {item.user.login}
+                          </div>
                         </div>
-                        <div>
-                          by {item.user.login}
-                        </div>
-                        <div>
-                          {item.comments} comments
+                        <div className="flex items-center gap-4">
+                          {pr && (
+                            <>
+                              {pr.additions > 0 && (
+                                <div className="text-green-600">+{pr.additions}</div>
+                              )}
+                              {pr.deletions > 0 && (
+                                <div className="text-red-600">-{pr.deletions}</div>
+                              )}
+                              <div>{pr.commits} commit{pr.commits !== 1 ? 's' : ''}</div>
+                              <div>{pr.changed_files} file{pr.changed_files !== 1 ? 's' : ''}</div>
+                            </>
+                          )}
+                          {item.comments > 0 && (
+                            <div className="flex items-center gap-1">
+                              <MessageCircle className="h-3 w-3" />
+                              {item.comments}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CardContent>
