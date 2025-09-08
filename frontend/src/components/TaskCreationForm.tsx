@@ -202,20 +202,18 @@ export function TaskCreationForm({
         />
       </div>
 
-      {!githubPullRequest && (
-        <div className="space-y-2">
-          <label htmlFor="branchName" className="text-sm font-medium">
-            Branch Name <span className="text-muted-foreground">(optional)</span>
-          </label>
-          <Input
-            id="branchName"
-            placeholder="feature/branch-name"
-            value={branchName}
-            onChange={(e) => setBranchName(e.target.value)}
-            disabled={isSubmitting}
-          />
-        </div>
-      )}
+      <div className="space-y-2">
+        <label htmlFor="branchName" className="text-sm font-medium">
+          Branch Name <span className="text-muted-foreground">(optional)</span>
+        </label>
+        <Input
+          id="branchName"
+          placeholder="feature/branch-name"
+          value={branchName}
+          onChange={(e) => setBranchName(e.target.value)}
+          disabled={isSubmitting || Boolean(githubPullRequest)}
+        />
+      </div>
 
       <div className="flex justify-end gap-2 pt-2">
         <Button 
