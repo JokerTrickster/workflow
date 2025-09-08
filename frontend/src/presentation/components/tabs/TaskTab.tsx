@@ -159,7 +159,7 @@ export function TaskTab({ repository }: TaskTabProps) {
       setTasks(prev => [newTask, ...prev]);
       
       // Log task creation
-      const metadata: any = {};
+      const metadata: { githubUrl?: string; issueNumber?: number; prNumber?: number; branchName?: string } = {};
       if (selectedGitHubIssue) {
         metadata.githubUrl = selectedGitHubIssue.html_url;
         metadata.issueNumber = selectedGitHubIssue.number;

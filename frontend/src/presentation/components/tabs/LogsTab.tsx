@@ -86,7 +86,10 @@ export function LogsTab({ repository }: LogsTabProps) {
   const [selectedType, setSelectedType] = useState<ActivityType | 'all'>('all');
   const [selectedDateRange, setSelectedDateRange] = useState<string>('24h');
   const [logs, setLogs] = useState<ActivityLog[]>([]);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<{
+    total: number;
+    recentActivity: number;
+  } | null>(null);
   
   const activityLogger = ActivityLogger.getInstance();
 

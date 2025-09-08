@@ -277,7 +277,7 @@ export class ActivityLogger {
   /**
    * GitHub-related events
    */
-  public logGitHubSync(repositoryName: string, type: 'started' | 'completed' | 'failed', details?: any): void {
+  public logGitHubSync(repositoryName: string, type: 'started' | 'completed' | 'failed', details?: { duration?: number; apiCallCount?: number; error?: string }): void {
     const level: ActivityLevel = type === 'failed' ? 'error' : type === 'completed' ? 'success' : 'info';
     const action = type === 'started' ? ACTIVITY_EVENTS.GITHUB_SYNC_STARTED : 
                    type === 'completed' ? ACTIVITY_EVENTS.GITHUB_SYNC_COMPLETED : 

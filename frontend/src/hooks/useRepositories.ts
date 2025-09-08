@@ -92,7 +92,6 @@ export function useRepositories(): UseRepositoriesReturn {
   // Connect repository mutation
   const connectMutation = useMutation({
     mutationFn: async ({ repoId, localPath }: { repoId: number; localPath?: string }) => {
-      const startTime = Date.now();
       
       try {
         // Here you could add API call to backend if needed

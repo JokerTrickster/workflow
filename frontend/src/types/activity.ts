@@ -41,7 +41,7 @@ export interface ActivityLogMetadata {
   currentTab?: string;
   
   // Additional context
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 export interface ActivityLog {
