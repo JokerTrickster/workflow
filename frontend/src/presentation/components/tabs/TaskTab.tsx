@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import { Repository } from '../../../domain/entities/Repository';
 import { Task } from '../../../domain/entities/Task';
+import { TaskCreationForm } from '../../../components/TaskCreationForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
 import { Input } from '../../../components/ui/input';
-import { Textarea } from '../../../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { 
   Plus, 
@@ -85,9 +85,10 @@ const mockTasks: Task[] = [
 
 export function TaskTab({ repository }: TaskTabProps) {
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskDescription, setNewTaskDescription] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [selectedGitHubIssue, setSelectedGitHubIssue] = useState<GitHubIssue | undefined>();
+  const [selectedGitHubPR, setSelectedGitHubPR] = useState<GitHubPullRequest | undefined>();
   
   // GitHub Issues and PRs state
   const [issuesFilter, setIssuesFilter] = useState<'all' | 'open' | 'closed'>('open');
@@ -122,24 +123,29 @@ export function TaskTab({ repository }: TaskTabProps) {
     enabled: repository.is_connected && activeSubTab === 'prs'
   });
 
-  // Task functions (existing functionality)
-  const handleCreateTask = () => {
-    if (!newTaskTitle.trim()) return;
+  // Task functions (enhanced with domain layer integration)
+  const handleCreateTask = async (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+    setIsCreatingTask(true);
+    try {
+      // For now, simulate the domain layer until we have a proper repository implementation
+      const newTask: Task = {
+        id: Date.now().toString(),
+        ...taskData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-    const newTask: Task = {
-      id: Date.now().toString(),
-      title: newTaskTitle,
-      description: newTaskDescription,
-      status: 'pending',
-      repository_id: repository.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    setTasks(prev => [newTask, ...prev]);
-    setNewTaskTitle('');
-    setNewTaskDescription('');
-    setShowCreateDialog(false);
+      setTasks(prev => [newTask, ...prev]);
+      setShowCreateDialog(false);
+      setSelectedGitHubIssue(undefined);
+      setSelectedGitHubPR(undefined);
+      setActiveSubTab('tasks'); // Switch to tasks tab to show the new task
+    } catch (error) {
+      console.error('Failed to create task:', error);
+      // TODO: Add proper error handling/notification
+    } finally {
+      setIsCreatingTask(false);
+    }
   };
 
   const handleExecuteTask = (taskId: string) => {
@@ -153,39 +159,21 @@ export function TaskTab({ repository }: TaskTabProps) {
   };
 
   const handleCreateTaskFromIssue = (issue: GitHubIssue) => {
-    const taskTitle = `Issue #${issue.number}: ${issue.title}`;
-    const taskDescription = `GitHub Issue: ${issue.html_url}\n\n${issue.body || 'No description provided'}`;
-
-    const newTask: Task = {
-      id: Date.now().toString(),
-      title: taskTitle,
-      description: taskDescription,
-      status: 'pending',
-      repository_id: repository.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    setTasks(prev => [newTask, ...prev]);
-    setActiveSubTab('tasks'); // Switch to tasks tab to show the new task
+    setSelectedGitHubIssue(issue);
+    setSelectedGitHubPR(undefined);
+    setShowCreateDialog(true);
   };
 
   const handleCreateTaskFromPR = (pr: GitHubPullRequest) => {
-    const taskTitle = `PR #${pr.number}: ${pr.title}`;
-    const taskDescription = `GitHub PR: ${pr.html_url}\nBranch: ${pr.head.ref} → ${pr.base.ref}\n\n${pr.body || 'No description provided'}`;
+    setSelectedGitHubPR(pr);
+    setSelectedGitHubIssue(undefined);
+    setShowCreateDialog(true);
+  };
 
-    const newTask: Task = {
-      id: Date.now().toString(),
-      title: taskTitle,
-      description: taskDescription,
-      status: 'pending',
-      repository_id: repository.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    setTasks(prev => [newTask, ...prev]);
-    setActiveSubTab('tasks'); // Switch to tasks tab to show the new task
+  const handleCancelTaskCreation = () => {
+    setShowCreateDialog(false);
+    setSelectedGitHubIssue(undefined);
+    setSelectedGitHubPR(undefined);
   };
 
   // Helper functions
@@ -277,37 +265,27 @@ export function TaskTab({ repository }: TaskTabProps) {
               New Task
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
-              <DialogTitle>Create New Task</DialogTitle>
+              <DialogTitle>
+                {selectedGitHubIssue || selectedGitHubPR ? 'Create Task from GitHub' : 'Create New Task'}
+              </DialogTitle>
               <DialogDescription>
-                Create a new task for the AI agent to work on.
+                {selectedGitHubIssue || selectedGitHubPR 
+                  ? 'Create a local task based on the selected GitHub item.'
+                  : 'Create a new task for the AI agent to work on.'
+                }
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div>
-                <Input
-                  placeholder="Task title"
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                />
-              </div>
-              <div>
-                <Textarea
-                  placeholder="Task description (optional)"
-                  value={newTaskDescription}
-                  onChange={(e) => setNewTaskDescription(e.target.value)}
-                  rows={4}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreateTask}>
-                  Create Task
-                </Button>
-              </div>
+            <div className="pt-4">
+              <TaskCreationForm
+                repositoryId={repository.id}
+                onSubmit={handleCreateTask}
+                onCancel={handleCancelTaskCreation}
+                githubIssue={selectedGitHubIssue}
+                githubPullRequest={selectedGitHubPR}
+                isSubmitting={isCreatingTask}
+              />
             </div>
           </DialogContent>
         </Dialog>
