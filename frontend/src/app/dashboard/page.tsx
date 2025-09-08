@@ -2,6 +2,10 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { ErrorHandler } from '../../utils/errorHandler';
+import { useErrorRecovery } from '../../hooks/useErrorRecovery';
+import { ErrorMessage } from '../../components/ErrorMessage';
+import { ErrorTestPanel } from '../../components/ErrorTestPanel';
 import { RepositoryCard } from '../../presentation/components/RepositoryCard';
 import { SearchFilter } from '../../presentation/components/SearchFilter';
 import { WorkspacePanel } from '../../presentation/components/WorkspacePanel';
@@ -120,6 +124,8 @@ export default function DashboardPage() {
     connected: 'all',
   });
 
+  const { error: recoveryError, setError, clearError } = useErrorRecovery();
+
   // Infinite query for repositories with pagination
   const {
     data,
@@ -234,8 +240,17 @@ export default function DashboardPage() {
   };
 
   const handleRefresh = () => {
+    clearError(); // 에러 상태 초기화
     refetch();
   };
+
+  // 에러 처리
+  useEffect(() => {
+    if (error) {
+      const appError = ErrorHandler.fromHttpError(error);
+      setError(appError, 'Dashboard - Repository fetch');
+    }
+  }, [error, setError]);
 
   // Infinite scroll handler
   const handleScroll = useCallback(() => {
@@ -256,25 +271,28 @@ export default function DashboardPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
 
-  if (error) {
+  // 에러 상태 표시
+  if (recoveryError) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto max-w-7xl px-4 py-8">
-          <Card className="max-w-md mx-auto">
-            <CardContent className="pt-6 text-center space-y-4">
-              <div className="text-destructive">
-                <Github className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold">Failed to load repositories</h3>
-                <p className="text-sm text-muted-foreground">
-                  Unable to fetch your GitHub repositories. Please try again.
-                </p>
+        <header className="border-b">
+          <div className="container mx-auto max-w-7xl px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Github className="h-8 w-8" />
+                <h1 className="text-2xl font-bold">Repository Dashboard</h1>
               </div>
-              <Button onClick={handleRefresh} className="gap-2">
-                <RefreshCw className="h-4 w-4" />
-                Try Again
-              </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        </header>
+        <div className="container mx-auto max-w-7xl px-4 py-8">
+          <div className="max-w-md mx-auto">
+            <ErrorMessage
+              error={recoveryError}
+              onRetry={handleRefresh}
+              showDetails={process.env.NODE_ENV === 'development'}
+            />
+          </div>
         </div>
       </div>
     );
@@ -431,6 +449,9 @@ export default function DashboardPage() {
           onClose={handleCloseWorkspace}
         />
       )}
+      
+      {/* Error Testing Panel - Development Only */}
+      <ErrorTestPanel />
     </div>
   );
 }
