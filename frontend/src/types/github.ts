@@ -97,7 +97,25 @@ export interface GitHubIssue {
   author_association: 'OWNER' | 'COLLABORATOR' | 'MEMBER' | 'CONTRIBUTOR' | 'FIRST_TIME_CONTRIBUTOR' | 'FIRST_TIMER' | 'NONE';
   reactions?: GitHubReactions;
   timeline_url?: string;
-  performed_via_github_app?: any; // Complex object, simplified for now
+  performed_via_github_app?: {
+    id: number;
+    slug: string;
+    node_id: string;
+    owner: GitHubUser;
+    name: string;
+    description: string;
+    external_url: string;
+    html_url: string;
+    created_at: string;
+    updated_at: string;
+    permissions: {
+      metadata: string;
+      contents: string;
+      issues: string;
+      single_file: string;
+    };
+    events: string[];
+  } | null;
   draft?: boolean;
 }
 
@@ -189,7 +207,17 @@ export interface GitHubPullRequest {
     permission: string;
     members_url: string;
     repositories_url: string;
-    parent: any | null;
+    parent: {
+      id: number;
+      node_id: string;
+      url: string;
+      html_url: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      privacy: 'closed' | 'secret';
+      permission: string;
+    } | null;
   }>;
   head: GitHubGitRef;
   base: GitHubGitRef;
@@ -326,7 +354,7 @@ export interface GitHubSearchIssuesResponse {
 }
 
 // Type guards for runtime type checking
-export function isGitHubIssue(item: any): item is GitHubIssue {
+export function isGitHubIssue(item: unknown): item is GitHubIssue {
   return typeof item === 'object' && 
          item !== null && 
          typeof item.id === 'number' && 
@@ -336,7 +364,7 @@ export function isGitHubIssue(item: any): item is GitHubIssue {
          !item.pull_request; // Issues don't have pull_request property
 }
 
-export function isGitHubPullRequest(item: any): item is GitHubPullRequest {
+export function isGitHubPullRequest(item: unknown): item is GitHubPullRequest {
   return typeof item === 'object' && 
          item !== null && 
          typeof item.id === 'number' && 
@@ -366,8 +394,8 @@ export interface GitHubRepo {
   default_branch: string;
 }
 
-export interface GitHubApiResponse {
-  repositories: any[]; // Using Repository from domain layer
+export interface GitHubApiResponse<T = unknown> {
+  repositories: T[];
   nextCursor?: number;
   hasMore: boolean;
 }

@@ -234,8 +234,6 @@ export class GitHubApiService {
       // Parse pagination metadata from headers
       const linkHeader = response.headers.get('Link');
       const hasNext = linkHeader?.includes('rel="next"') || false;
-      const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining');
-      const rateLimitReset = response.headers.get('X-RateLimit-Reset');
 
       return {
         issues: filteredIssues,
@@ -308,8 +306,6 @@ export class GitHubApiService {
       // Parse pagination metadata from headers
       const linkHeader = response.headers.get('Link');
       const hasNext = linkHeader?.includes('rel="next"') || false;
-      const rateLimitRemaining = response.headers.get('X-RateLimit-Remaining');
-      const rateLimitReset = response.headers.get('X-RateLimit-Reset');
 
       return {
         pullRequests,
