@@ -3,9 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '../components/ui/button';
 import { Github, ArrowRight } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function HomePage() {
   const router = useRouter();
+  const { signInWithGitHub, loading } = useAuth();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
@@ -30,9 +32,15 @@ export default function HomePage() {
             <ArrowRight className="h-5 w-5" />
             Go to Dashboard
           </Button>
-          <Button variant="outline" size="lg" className="gap-2">
+          <Button 
+            variant="outline" 
+            size="lg" 
+            className="gap-2"
+            onClick={signInWithGitHub}
+            disabled={loading}
+          >
             <Github className="h-5 w-5" />
-            Login with GitHub
+            {loading ? 'Signing in...' : 'Login with GitHub'}
           </Button>
         </div>
 
