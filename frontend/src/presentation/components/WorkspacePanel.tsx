@@ -8,88 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge';
 import { ExternalLink, Activity, BarChart3, AlertCircle, CheckCircle } from 'lucide-react';
 import { TaskTab } from './tabs/TaskTab';
+import { LogsTab } from './tabs/LogsTab';
+import { DashboardTab } from './tabs/DashboardTab';
 
 interface WorkspacePanelProps {
   repository: Repository;
   onClose: () => void;
 }
-
-// Placeholder components for the other two tabs
-
-const LogsTab = () => {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Activity className="h-5 w-5" />
-          Activity Logs
-        </h2>
-      </div>
-      <div className="text-center py-12">
-        <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <h3 className="text-lg font-semibold mb-2">No logs available yet</h3>
-        <p className="text-sm text-muted-foreground">
-          Activity logs will appear here when tasks are executed
-        </p>
-      </div>
-    </div>
-  );
-};
-
-const DashboardTab = () => {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" />
-          Dashboard
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">
-              +2 from last week
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">8</div>
-            <p className="text-xs text-muted-foreground">
-              66% completion rate
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">3</div>
-            <p className="text-xs text-muted-foreground">
-              Active tasks
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      <div className="text-center py-8">
-        <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <h3 className="text-lg font-semibold mb-2">Dashboard Coming Soon</h3>
-        <p className="text-sm text-muted-foreground">
-          Detailed analytics and insights will be available here
-        </p>
-      </div>
-    </div>
-  );
-};
 
 
 export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
@@ -217,11 +142,11 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
           </TabsContent>
 
           <TabsContent value="logs" className="space-y-4">
-            <LogsTab />
+            <LogsTab repository={repository} />
           </TabsContent>
 
           <TabsContent value="dashboard" className="space-y-4">
-            <DashboardTab />
+            <DashboardTab repository={repository} />
           </TabsContent>
         </Tabs>
       </div>
