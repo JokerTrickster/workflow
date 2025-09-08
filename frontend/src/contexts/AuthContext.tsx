@@ -32,18 +32,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         setLoading(true)
         
+        console.log('Initializing auth...')
+        console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+        console.log('Supabase Anon Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+        
         // Get initial session
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
-          console.error('Error getting session:', error)
+          console.error('Supabase auth error:', error)
+          console.error('Error details:', JSON.stringify(error, null, 2))
           setError(error.message)
         } else {
+          console.log('Auth session:', session)
           setSession(session as AuthSession | null)
           setUser(session?.user as AuthUser | null)
         }
       } catch (error) {
-        console.error('Auth initialization error:', error)
+        console.error('Auth initialization catch error:', error)
+        console.error('Error stack:', (error as Error)?.stack)
         setError('Failed to initialize authentication')
       } finally {
         setLoading(false)

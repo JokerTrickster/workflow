@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { ErrorHandler } from '../../utils/errorHandler';
 import { useErrorRecovery } from '../../hooks/useErrorRecovery';
+import { useAuth } from '../../contexts/AuthContext';
 import { ErrorMessage } from '../../components/ErrorMessage';
 import { ErrorTestPanel } from '../../components/ErrorTestPanel';
 import { RepositoryCard } from '../../presentation/components/RepositoryCard';
@@ -13,6 +14,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Github, Plus, RefreshCw } from 'lucide-react';
 import { Repository } from '../../domain/entities/Repository';
+import { GitHubApiService } from '../../services/githubApi';
 
 // Mock data for development - TODO: Replace with actual API call
 const mockRepositories: Repository[] = [
@@ -125,8 +127,9 @@ export default function DashboardPage() {
   });
 
   const { error: recoveryError, setError, clearError } = useErrorRecovery();
+  const { user, isAuthenticated } = useAuth();
 
-  // Infinite query for repositories with pagination
+  // Infinite query for repositories with pagination using GitHub API
   const {
     data,
     isLoading,
@@ -136,47 +139,26 @@ export default function DashboardPage() {
     fetchNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['repositories'],
-    queryFn: async ({ pageParam = 0 }) => {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+    queryKey: ['repositories', user?.id],
+    queryFn: async ({ pageParam = 1 }) => {
+      console.log('Fetching repositories from GitHub API, page:', pageParam);
       
-      const pageSize = 12; // 12 items per page for nice grid layout
-      const start = pageParam * pageSize;
-      const end = start + pageSize;
-      
-      // Simulate paginated response
-      const paginatedRepos = mockRepositories.slice(start, end);
-      
-      // Add more mock data to test pagination
-      const extraRepos = Array.from({ length: Math.max(0, pageSize - paginatedRepos.length) }, (_, index) => ({
-        id: mockRepositories.length + start + index + 1,
-        name: `repo-${start + index + 1}`,
-        full_name: `captain/repo-${start + index + 1}`,
-        description: `Mock repository ${start + index + 1} for testing pagination`,
-        html_url: `https://github.com/captain/repo-${start + index + 1}`,
-        clone_url: `https://github.com/captain/repo-${start + index + 1}.git`,
-        ssh_url: `git@github.com:captain/repo-${start + index + 1}.git`,
-        private: Math.random() > 0.5,
-        language: ['TypeScript', 'JavaScript', 'Python', 'Go', 'Rust'][Math.floor(Math.random() * 5)],
-        stargazers_count: Math.floor(Math.random() * 100),
-        forks_count: Math.floor(Math.random() * 20),
-        created_at: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
-        updated_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-        pushed_at: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-        default_branch: 'main',
-        is_connected: Math.random() > 0.7,
-      }));
-      
-      const allRepos = [...paginatedRepos, ...extraRepos].slice(0, pageSize);
-      
-      return {
-        repositories: allRepos,
-        nextCursor: allRepos.length === pageSize ? pageParam + 1 : undefined,
-      };
+      if (!isAuthenticated) {
+        throw new Error('User not authenticated');
+      }
+
+      try {
+        const result = await GitHubApiService.fetchUserRepositories(pageParam, 30);
+        console.log('GitHub API result:', result);
+        return result;
+      } catch (error) {
+        console.error('GitHub API error:', error);
+        throw error;
+      }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    initialPageParam: 0,
+    initialPageParam: 1,
+    enabled: isAuthenticated, // Only run query when user is authenticated
   });
 
   // Flatten all pages of repositories
@@ -270,6 +252,44 @@ export default function DashboardPage() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
+
+  // Authentication check
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b">
+          <div className="container mx-auto max-w-7xl px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Github className="h-8 w-8" />
+                <h1 className="text-2xl font-bold">Repository Dashboard</h1>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div className="container mx-auto max-w-7xl px-4 py-8">
+          <Card className="max-w-md mx-auto">
+            <CardContent className="pt-6 text-center space-y-4">
+              <div>
+                <Github className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-semibold">Sign in required</h3>
+                <p className="text-sm text-muted-foreground">
+                  Please sign in with GitHub to view your repositories
+                </p>
+              </div>
+              <Button 
+                onClick={() => window.location.href = '/'}
+                className="gap-2"
+              >
+                <Github className="h-4 w-4" />
+                Go to Sign In
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   // 에러 상태 표시
   if (recoveryError) {
