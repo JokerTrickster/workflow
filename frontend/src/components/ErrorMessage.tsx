@@ -100,10 +100,10 @@ export function ErrorMessage({
   }
 
   return (
-    <Card className={`border-destructive/20 ${className}`}>
+    <Card className={`border-destructive/20 ${className}`} role="alert" aria-live="assertive">
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
-          <div className={`p-2 rounded-full ${colorClass}`}>
+          <div className={`p-2 rounded-full ${colorClass}`} aria-hidden="true">
             <IconComponent className="h-5 w-5" />
           </div>
           
@@ -122,8 +122,9 @@ export function ErrorMessage({
               size="sm"
               onClick={onDismiss}
               className="h-8 w-8 p-0"
+              aria-label="오류 메시지 닫기"
             >
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </Button>
           )}
         </div>
@@ -153,8 +154,9 @@ export function ErrorMessage({
                 onClick={handleRetry}
                 disabled={isRetrying}
                 className="gap-2"
+                aria-describedby={`error-${error.id}`}
               >
-                <RefreshCw className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} aria-hidden="true" />
                 {isRetrying ? '다시 시도 중...' : '다시 시도'}
               </Button>
             )}
