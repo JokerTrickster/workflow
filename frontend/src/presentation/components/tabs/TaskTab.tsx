@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Repository } from '../../../domain/entities/Repository';
 import { Task } from '../../../domain/entities/Task';
 import { TaskCreationForm } from '../../../components/TaskCreationForm';
+import { ActivityLogger } from '../../../services/ActivityLogger';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -102,6 +103,8 @@ export function TaskTab({ repository }: TaskTabProps) {
   const [selectedGitHubIssue, setSelectedGitHubIssue] = useState<GitHubIssue | undefined>();
   const [selectedGitHubPR, setSelectedGitHubPR] = useState<GitHubPullRequest | undefined>();
   
+  const activityLogger = ActivityLogger.getInstance();
+  
   // GitHub Issues and PRs state
   const [issuesFilter, setIssuesFilter] = useState<'all' | 'open' | 'closed'>('open');
   const [prsFilter, setPrsFilter] = useState<'all' | 'open' | 'closed'>('open');
@@ -154,12 +157,43 @@ export function TaskTab({ repository }: TaskTabProps) {
       };
 
       setTasks(prev => [newTask, ...prev]);
+      
+      // Log task creation
+      const metadata: any = {};
+      if (selectedGitHubIssue) {
+        metadata.githubUrl = selectedGitHubIssue.html_url;
+        metadata.issueNumber = selectedGitHubIssue.number;
+      }
+      if (selectedGitHubPR) {
+        metadata.githubUrl = selectedGitHubPR.html_url;
+        metadata.prNumber = selectedGitHubPR.number;
+      }
+      if (newTask.branch_name) {
+        metadata.branchName = newTask.branch_name;
+      }
+      
+      activityLogger.logTaskCreated(
+        newTask.id,
+        newTask.title,
+        repository.id,
+        repository.name,
+        metadata
+      );
+      
       setShowCreateDialog(false);
       setSelectedGitHubIssue(undefined);
       setSelectedGitHubPR(undefined);
       setActiveSubTab('tasks'); // Switch to tasks tab to show the new task
     } catch (error) {
       console.error('Failed to create task:', error);
+      
+      // Log task creation failure
+      activityLogger.logTaskFailed(
+        'unknown',
+        taskData.title,
+        error instanceof Error ? error.message : 'Unknown error during task creation'
+      );
+      
       // TODO: Add proper error handling/notification
     } finally {
       setIsCreatingTask(false);
@@ -167,13 +201,19 @@ export function TaskTab({ repository }: TaskTabProps) {
   };
 
   const handleExecuteTask = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    
     setTasks(prev =>
-      prev.map(task =>
-        task.id === taskId 
-          ? { ...task, status: 'in_progress', started_at: new Date().toISOString() }
-          : task
+      prev.map(t =>
+        t.id === taskId 
+          ? { ...t, status: 'in_progress', started_at: new Date().toISOString() }
+          : t
       )
     );
+    
+    // Log task execution started
+    activityLogger.logTaskStarted(taskId, task.title);
   };
 
   const handleCreateTaskFromIssue = (issue: GitHubIssue) => {

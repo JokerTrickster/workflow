@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { Repository } from '@/domain/entities/Repository';
+import { ActivityLogger } from './ActivityLogger';
 import {
   GitHubRepo,
   GitHubApiResponse,
@@ -51,6 +52,10 @@ export class GitHubApiService {
   }
 
   private static async makeApiRequest(url: string, accessToken: string, retries = 3): Promise<Response> {
+    const activityLogger = ActivityLogger.getInstance();
+    const method = 'GET'; // Most API calls are GET requests
+    const endpoint = url.replace('https://api.github.com', '');
+    
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const response = await fetch(url, {
@@ -61,7 +66,19 @@ export class GitHubApiService {
           }
         });
 
+        // Log API call and rate limit info
+        const rateLimitRemaining = parseInt(response.headers.get('X-RateLimit-Remaining') || '0');
+        activityLogger.logGitHubApiCall(endpoint, method, rateLimitRemaining);
+
         if (response.ok) {
+          // Log rate limit warning if needed
+          if (rateLimitRemaining <= 100) {
+            const rateLimitReset = response.headers.get('X-RateLimit-Reset');
+            const resetTime = rateLimitReset 
+              ? new Date(parseInt(rateLimitReset) * 1000).toLocaleTimeString() 
+              : 'unknown';
+            activityLogger.logGitHubRateLimit(rateLimitRemaining, resetTime);
+          }
           return response;
         }
 
@@ -74,6 +91,9 @@ export class GitHubApiService {
           const resetTime = rateLimitReset 
             ? new Date(parseInt(rateLimitReset) * 1000).toLocaleTimeString() 
             : 'unknown';
+          
+          // Log rate limit exceeded
+          activityLogger.logGitHubRateLimit(0, resetTime);
           
           if (attempt < retries) {
             // Wait with exponential backoff for rate limit
@@ -133,12 +153,16 @@ export class GitHubApiService {
 
   static async fetchUserRepositories(page = 1, perPage = 30): Promise<GitHubApiResponse> {
     const accessToken = await this.getAccessToken();
+    const activityLogger = ActivityLogger.getInstance();
+    const startTime = Date.now();
     
     if (!accessToken) {
       throw new Error('No GitHub access token available. Please sign in with GitHub.');
     }
 
     try {
+      activityLogger.logGitHubSync('user repositories', 'started');
+      
       const url = `https://api.github.com/user/repos?page=${page}&per_page=${perPage}&sort=updated&type=all`;
       const response = await this.makeApiRequest(url, accessToken);
 
@@ -149,12 +173,17 @@ export class GitHubApiService {
       const linkHeader = response.headers.get('Link');
       const hasNext = linkHeader?.includes('rel="next"') || false;
 
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync('user repositories', 'completed', { duration, apiCallCount: 1 });
+
       return {
         repositories: transformedRepos,
         nextCursor: hasNext ? page + 1 : undefined,
         hasMore: hasNext
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync('user repositories', 'failed', { error: error instanceof Error ? error.message : 'Unknown error', duration });
       console.error('Failed to fetch repositories from GitHub:', error);
       throw error;
     }
@@ -197,6 +226,8 @@ export class GitHubApiService {
       ...otherParams
     } = params;
     const accessToken = await this.getAccessToken();
+    const activityLogger = ActivityLogger.getInstance();
+    const startTime = Date.now();
     
     if (!accessToken) {
       throw new Error('No GitHub access token available. Please sign in with GitHub.');
@@ -208,6 +239,8 @@ export class GitHubApiService {
     }
 
     try {
+      activityLogger.logGitHubSync(`${repoId} issues`, 'started');
+      
       // Build query parameters
       const queryParams = new URLSearchParams({
         page: page.toString(),
@@ -235,6 +268,9 @@ export class GitHubApiService {
       const linkHeader = response.headers.get('Link');
       const hasNext = linkHeader?.includes('rel="next"') || false;
 
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync(`${repoId} issues`, 'completed', { duration, apiCallCount: 1 });
+
       return {
         issues: filteredIssues,
         nextCursor: hasNext ? page + 1 : undefined,
@@ -248,6 +284,8 @@ export class GitHubApiService {
         links: linkHeader ? this.parseLinkHeader(linkHeader) : undefined
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync(`${repoId} issues`, 'failed', { error: error instanceof Error ? error.message : 'Unknown error', duration });
       console.error(`Failed to fetch issues for repository ${repoId}:`, error);
       throw error;
     }
@@ -272,6 +310,8 @@ export class GitHubApiService {
       ...otherParams
     } = params;
     const accessToken = await this.getAccessToken();
+    const activityLogger = ActivityLogger.getInstance();
+    const startTime = Date.now();
     
     if (!accessToken) {
       throw new Error('No GitHub access token available. Please sign in with GitHub.');
@@ -283,6 +323,8 @@ export class GitHubApiService {
     }
 
     try {
+      activityLogger.logGitHubSync(`${repoId} pull requests`, 'started');
+      
       // Build query parameters
       const queryParams = new URLSearchParams({
         page: page.toString(),
@@ -307,6 +349,9 @@ export class GitHubApiService {
       const linkHeader = response.headers.get('Link');
       const hasNext = linkHeader?.includes('rel="next"') || false;
 
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync(`${repoId} pull requests`, 'completed', { duration, apiCallCount: 1 });
+
       return {
         pullRequests,
         nextCursor: hasNext ? page + 1 : undefined,
@@ -320,6 +365,8 @@ export class GitHubApiService {
         links: linkHeader ? this.parseLinkHeader(linkHeader) : undefined
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync(`${repoId} pull requests`, 'failed', { error: error instanceof Error ? error.message : 'Unknown error', duration });
       console.error(`Failed to fetch pull requests for repository ${repoId}:`, error);
       throw error;
     }

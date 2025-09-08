@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Repository } from '../../../domain/entities/Repository';
+import { ActivityLogger } from '../../../services/ActivityLogger';
+import { ActivityLog, ActivityType, ActivityLevel } from '../../../types/activity';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
@@ -21,117 +23,15 @@ import {
   AlertCircle,
   Clock,
   Users,
-  ExternalLink
+  ExternalLink,
+  Trash2,
+  BarChart3
 } from 'lucide-react';
 
 interface LogsTabProps {
   repository: Repository;
 }
 
-// Activity log types for filtering
-type ActivityType = 'connection' | 'task' | 'github' | 'navigation' | 'all';
-type ActivityLevel = 'info' | 'success' | 'warning' | 'error';
-
-interface ActivityLog {
-  id: string;
-  timestamp: string;
-  type: ActivityType;
-  level: ActivityLevel;
-  title: string;
-  description: string;
-  metadata?: {
-    taskId?: string;
-    branchName?: string;
-    prUrl?: string;
-    issueNumber?: number;
-    duration?: number;
-    userId?: string;
-  };
-}
-
-// Mock activity logs data - in a real app, this would come from a service
-const generateMockLogs = (repository: Repository): ActivityLog[] => {
-  const baseTime = new Date();
-  return [
-    {
-      id: '1',
-      timestamp: new Date(baseTime.getTime() - 5 * 60 * 1000).toISOString(),
-      type: 'github',
-      level: 'success',
-      title: 'Repository synchronized',
-      description: `Successfully fetched latest issues and pull requests from ${repository.name}`,
-      metadata: {
-        duration: 1200
-      }
-    },
-    {
-      id: '2',
-      timestamp: new Date(baseTime.getTime() - 15 * 60 * 1000).toISOString(),
-      type: 'task',
-      level: 'info',
-      title: 'Task created',
-      description: 'New task "Add dark mode support" created and assigned to repository',
-      metadata: {
-        taskId: 'task-1',
-        branchName: 'feature/dark-mode'
-      }
-    },
-    {
-      id: '3',
-      timestamp: new Date(baseTime.getTime() - 30 * 60 * 1000).toISOString(),
-      type: 'github',
-      level: 'success',
-      title: 'Pull request merged',
-      description: 'PR #42: "Fix responsive design issues" was successfully merged',
-      metadata: {
-        prUrl: `${repository.html_url}/pull/42`
-      }
-    },
-    {
-      id: '4',
-      timestamp: new Date(baseTime.getTime() - 45 * 60 * 1000).toISOString(),
-      type: 'connection',
-      level: 'success',
-      title: 'Repository connected',
-      description: `Successfully connected to ${repository.name} repository`,
-      metadata: {
-        duration: 800
-      }
-    },
-    {
-      id: '5',
-      timestamp: new Date(baseTime.getTime() - 60 * 60 * 1000).toISOString(),
-      type: 'navigation',
-      level: 'info',
-      title: 'Workspace opened',
-      description: `Accessed workspace for ${repository.name}`,
-      metadata: {}
-    },
-    {
-      id: '6',
-      timestamp: new Date(baseTime.getTime() - 75 * 60 * 1000).toISOString(),
-      type: 'github',
-      level: 'warning',
-      title: 'API rate limit warning',
-      description: 'GitHub API rate limit at 80%, consider reducing request frequency',
-      metadata: {}
-    },
-    {
-      id: '7',
-      timestamp: new Date(baseTime.getTime() - 120 * 60 * 1000).toISOString(),
-      type: 'task',
-      level: 'success',
-      title: 'Task completed',
-      description: 'Task "Implement authentication system" completed successfully',
-      metadata: {
-        taskId: 'task-7',
-        branchName: 'feature/auth-system',
-        prUrl: `${repository.html_url}/pull/41`,
-        duration: 3600
-      }
-    }
-  ];
-};
 
 const formatRelativeTime = (timestamp: string): string => {
   const now = new Date();
@@ -183,15 +83,41 @@ const getActivityBadgeColor = (type: ActivityType): string => {
 
 export function LogsTab({ repository }: LogsTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<ActivityType>('all');
+  const [selectedType, setSelectedType] = useState<ActivityType | 'all'>('all');
   const [selectedDateRange, setSelectedDateRange] = useState<string>('24h');
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [stats, setStats] = useState<any>(null);
   
-  // Generate mock logs
-  const mockLogs = generateMockLogs(repository);
+  const activityLogger = ActivityLogger.getInstance();
+
+  // Subscribe to activity logger updates
+  useEffect(() => {
+    const unsubscribe = activityLogger.subscribe((updatedLogs) => {
+      setLogs(updatedLogs);
+    });
+
+    // Initial load
+    setLogs(activityLogger.getLogs());
+    setStats(activityLogger.getStatistics());
+
+    // Log workspace access
+    activityLogger.logWorkspaceAccess(repository.name, 'opened');
+
+    return () => {
+      unsubscribe();
+    };
+  }, [repository.id, repository.name, activityLogger]);
   
   // Filter logs based on search and filters
   const filteredLogs = useMemo(() => {
-    let filtered = mockLogs;
+    let filtered = logs;
+    
+    // Filter by repository if needed (for multi-repo support)
+    filtered = filtered.filter(log => 
+      !log.metadata?.repositoryId || 
+      log.metadata.repositoryId === repository.id ||
+      log.metadata?.repositoryName === repository.name
+    );
     
     // Filter by type
     if (selectedType !== 'all') {
@@ -226,28 +152,27 @@ export function LogsTab({ repository }: LogsTabProps) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(log => 
         log.title.toLowerCase().includes(query) ||
-        log.description.toLowerCase().includes(query)
+        log.description.toLowerCase().includes(query) ||
+        log.metadata?.repositoryName?.toLowerCase().includes(query) ||
+        log.metadata?.taskTitle?.toLowerCase().includes(query)
       );
     }
     
-    return filtered.sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-  }, [mockLogs, searchQuery, selectedType, selectedDateRange]);
+    return filtered;
+  }, [logs, searchQuery, selectedType, selectedDateRange, repository.id, repository.name]);
   
   const handleExportLogs = () => {
-    const csvContent = [
-      ['Timestamp', 'Type', 'Level', 'Title', 'Description'].join(','),
-      ...filteredLogs.map(log => [
-        log.timestamp,
-        log.type,
-        log.level,
-        `"${log.title}"`,
-        `"${log.description}"`
-      ].join(','))
-    ].join('\n');
+    const exportData = activityLogger.exportLogs({
+      format: 'csv',
+      includeMetadata: true,
+      filters: {
+        type: selectedType === 'all' ? undefined : selectedType,
+        searchQuery: searchQuery.trim() || undefined,
+        repositoryId: repository.id
+      }
+    });
     
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const blob = new Blob([exportData], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -255,24 +180,52 @@ export function LogsTab({ repository }: LogsTabProps) {
     link.click();
     window.URL.revokeObjectURL(url);
   };
+
+  const handleClearLogs = () => {
+    if (confirm('Are you sure you want to clear all activity logs? This action cannot be undone.')) {
+      activityLogger.clearLogs();
+    }
+  };
   
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Activity className="h-5 w-5" />
-          Activity Logs
-        </h2>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleExportLogs}
-          disabled={filteredLogs.length === 0}
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Export
-        </Button>
+        <div className="flex items-center gap-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Activity Logs
+          </h2>
+          {stats && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <BarChart3 className="h-4 w-4" />
+              <span>{stats.total} total</span>
+              <span>•</span>
+              <span>{stats.recentActivity} recent</span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleExportLogs}
+            disabled={filteredLogs.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleClearLogs}
+            disabled={logs.length === 0}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Clear
+          </Button>
+        </div>
       </div>
       
       {/* Filters */}
@@ -376,30 +329,59 @@ export function LogsTab({ repository }: LogsTabProps) {
                       {/* Metadata */}
                       {log.metadata && Object.keys(log.metadata).length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
+                          {log.metadata.taskTitle && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                              <CheckCircle className="h-3 w-3" />
+                              {log.metadata.taskTitle}
+                            </div>
+                          )}
                           {log.metadata.branchName && (
                             <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                               <GitBranch className="h-3 w-3" />
                               {log.metadata.branchName}
                             </div>
                           )}
-                          {log.metadata.prUrl && (
+                          {(log.metadata.prUrl || log.metadata.githubUrl) && (
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-6 px-2 text-xs"
                               asChild
                             >
-                              <a href={log.metadata.prUrl} target="_blank" rel="noopener noreferrer">
+                              <a href={log.metadata.prUrl || log.metadata.githubUrl} target="_blank" rel="noopener noreferrer">
                                 <GitPullRequest className="h-3 w-3 mr-1" />
-                                View PR
+                                {log.metadata.prNumber ? `PR #${log.metadata.prNumber}` : 'View'}
                                 <ExternalLink className="h-3 w-3 ml-1" />
                               </a>
                             </Button>
+                          )}
+                          {log.metadata.issueNumber && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground bg-green-50 text-green-700 px-2 py-1 rounded">
+                              <AlertCircle className="h-3 w-3" />
+                              Issue #{log.metadata.issueNumber}
+                            </div>
                           )}
                           {log.metadata.duration && (
                             <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                               <Clock className="h-3 w-3" />
                               {Math.round(log.metadata.duration / 1000)}s
+                            </div>
+                          )}
+                          {log.metadata.rateLimitRemaining !== undefined && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground bg-yellow-50 text-yellow-700 px-2 py-1 rounded">
+                              <AlertCircle className="h-3 w-3" />
+                              Rate limit: {log.metadata.rateLimitRemaining}
+                            </div>
+                          )}
+                          {log.metadata.errorMessage && (
+                            <div className="flex items-center gap-1 text-xs text-red-700 bg-red-50 px-2 py-1 rounded max-w-xs truncate">
+                              <XCircle className="h-3 w-3 shrink-0" />
+                              <span title={log.metadata.errorMessage}>
+                                {log.metadata.errorMessage.length > 30 
+                                  ? `${log.metadata.errorMessage.substring(0, 30)}...` 
+                                  : log.metadata.errorMessage
+                                }
+                              </span>
                             </div>
                           )}
                         </div>

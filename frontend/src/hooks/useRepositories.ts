@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Repository } from '../domain/entities/Repository';
 import { GitHubApiService } from '../services/githubApi';
+import { ActivityLogger } from '../services/ActivityLogger';
 import { useCallback, useEffect, useState } from 'react';
 
 const REPOSITORIES_QUERY_KEY = 'repositories';
@@ -36,6 +37,7 @@ interface UseRepositoriesReturn {
 export function useRepositories(): UseRepositoriesReturn {
   const queryClient = useQueryClient();
   const [connectionStates, setConnectionStates] = useState<RepositoryConnectionState>({});
+  const activityLogger = ActivityLogger.getInstance();
 
   // Load connection states from localStorage on mount
   useEffect(() => {
@@ -90,18 +92,36 @@ export function useRepositories(): UseRepositoriesReturn {
   // Connect repository mutation
   const connectMutation = useMutation({
     mutationFn: async ({ repoId, localPath }: { repoId: number; localPath?: string }) => {
-      // Here you could add API call to backend if needed
-      // For now, we'll just update local state
-      const newState = {
-        ...connectionStates,
-        [repoId]: {
-          is_connected: true,
-          local_path: localPath,
-          connected_at: new Date().toISOString(),
-        },
-      };
-      saveConnectionStates(newState);
-      return newState;
+      const startTime = Date.now();
+      
+      try {
+        // Here you could add API call to backend if needed
+        // For now, we'll just update local state
+        const newState = {
+          ...connectionStates,
+          [repoId]: {
+            is_connected: true,
+            local_path: localPath,
+            connected_at: new Date().toISOString(),
+          },
+        };
+        saveConnectionStates(newState);
+        
+        // Log successful connection
+        const repo = repositories.find(r => r.id === repoId);
+        if (repo) {
+          activityLogger.logRepositoryConnected(repoId, repo.name, localPath);
+        }
+        
+        return newState;
+      } catch (error) {
+        // Log failed connection
+        const repo = repositories.find(r => r.id === repoId);
+        if (repo) {
+          activityLogger.logRepositoryConnectionFailed(repo.name, error instanceof Error ? error.message : 'Unknown error');
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       // Invalidate and refetch repositories to update UI
@@ -115,6 +135,9 @@ export function useRepositories(): UseRepositoriesReturn {
   // Disconnect repository mutation
   const disconnectMutation = useMutation({
     mutationFn: async (repoId: number) => {
+      // Log disconnection
+      const repo = repositories.find(r => r.id === repoId);
+      
       // Here you could add API call to backend if needed
       // For now, we'll just update local state
       const newState = {
@@ -126,6 +149,11 @@ export function useRepositories(): UseRepositoriesReturn {
         },
       };
       saveConnectionStates(newState);
+      
+      if (repo) {
+        activityLogger.logRepositoryDisconnected(repoId, repo.name);
+      }
+      
       return newState;
     },
     onSuccess: () => {
