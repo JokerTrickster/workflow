@@ -1,6 +1,6 @@
 /**
  * Activity Logger Service
- * Manages activity logging with localStorage persistence and filtering capabilities
+ * Manages activity logging with localStorage persistence, filtering capabilities, and Korean localization
  */
 
 import { 
@@ -13,6 +13,8 @@ import {
   ACTIVITY_EVENTS,
   ActivityEventType
 } from '../types/activity';
+import { useI18n } from '../contexts/I18nContext';
+import { TemplateParams } from '../types/i18n';
 
 export class ActivityLogger {
   private static readonly STORAGE_KEY = 'workflow_activity_logs';
@@ -21,6 +23,7 @@ export class ActivityLogger {
   
   private logs: ActivityLog[] = [];
   private listeners: ((logs: ActivityLog[]) => void)[] = [];
+  private tFunc: ((key: string, params?: TemplateParams) => string) | null = null;
 
   private constructor() {
     this.loadLogs();
@@ -32,6 +35,65 @@ export class ActivityLogger {
       ActivityLogger.instance = new ActivityLogger();
     }
     return ActivityLogger.instance;
+  }
+
+  /**
+   * Set the translation function for Korean localization
+   */
+  public setTranslationFunction(t: (key: string, params?: TemplateParams) => string): void {
+    this.tFunc = t;
+  }
+
+  /**
+   * Get localized message or fallback to English
+   */
+  private getLocalizedMessage(messageKey: string, params?: TemplateParams): string {
+    if (this.tFunc) {
+      try {
+        return this.tFunc(`logs.${messageKey}`, params);
+      } catch (error) {
+        // Fallback to English if translation fails
+        console.warn(`Translation failed for logs.${messageKey}, using fallback`);
+      }
+    }
+    
+    // Fallback to English messages
+    return this.getEnglishFallback(messageKey, params);
+  }
+
+  /**
+   * English fallback messages
+   */
+  private getEnglishFallback(messageKey: string, params?: TemplateParams): string {
+    const fallbackMessages: Record<string, string> = {
+      repository_connected: 'Successfully connected to {{repositoryName}} repository',
+      repository_disconnected: 'Disconnected from {{repositoryName}} repository',
+      repository_connection_failed: 'Failed to connect to {{repositoryName}}: {{error}}',
+      task_created: 'New task "{{taskTitle}}" created for {{repositoryName}}',
+      task_started: 'Task "{{taskTitle}}" execution started',
+      task_completed: 'Task "{{taskTitle}}" completed successfully',
+      task_failed: 'Task "{{taskTitle}}" failed: {{error}}',
+      task_cancelled: 'Task "{{taskTitle}}" was cancelled',
+      github_sync_started: 'GitHub synchronization started for {{repositoryName}}',
+      github_sync_completed: 'GitHub synchronization completed for {{repositoryName}}',
+      github_sync_failed: 'GitHub synchronization failed for {{repositoryName}}',
+      github_api_call: 'GitHub API call: {{method}} {{endpoint}}',
+      github_rate_limit: 'GitHub API rate limit: {{remaining}} requests remaining. Resets at {{resetTime}}',
+      tab_switched: 'Switched from {{previousTab}} to {{currentTab}} tab in {{repositoryName}}',
+      workspace_opened: 'Accessed workspace for {{repositoryName}}',
+      workspace_closed: 'Closed workspace for {{repositoryName}}'
+    };
+
+    let message = fallbackMessages[messageKey] || messageKey;
+    
+    // Simple parameter replacement for fallback
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        message = message.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value));
+      });
+    }
+    
+    return message;
   }
 
   /**
@@ -164,14 +226,17 @@ export class ActivityLogger {
   }
 
   /**
-   * Repository connection events
+   * Repository connection events with Korean localization
    */
   public logRepositoryConnected(repositoryId: number, repositoryName: string, localPath?: string): void {
+    const title = this.getLocalizedMessage('user_actions.repository_connected');
+    const description = this.getLocalizedMessage('repository_connected', { repositoryName });
+    
     this.log(
       'connection',
       'success',
-      'Repository connected',
-      `Successfully connected to ${repositoryName} repository`,
+      title,
+      description,
       {
         repositoryId,
         repositoryName,
@@ -182,11 +247,14 @@ export class ActivityLogger {
   }
 
   public logRepositoryDisconnected(repositoryId: number, repositoryName: string): void {
+    const title = this.getLocalizedMessage('user_actions.repository_disconnected');
+    const description = this.getLocalizedMessage('repository_disconnected', { repositoryName });
+    
     this.log(
       'connection',
       'info',
-      'Repository disconnected',
-      `Disconnected from ${repositoryName} repository`,
+      title,
+      description,
       {
         repositoryId,
         repositoryName,
@@ -196,11 +264,14 @@ export class ActivityLogger {
   }
 
   public logRepositoryConnectionFailed(repositoryName: string, error: string): void {
+    const title = this.getLocalizedMessage('user_actions.repository_connection_failed');
+    const description = this.getLocalizedMessage('repository_connection_failed', { repositoryName, error });
+    
     this.log(
       'connection',
       'error',
-      'Repository connection failed',
-      `Failed to connect to ${repositoryName}: ${error}`,
+      title,
+      description,
       {
         repositoryName,
         errorMessage: error,
@@ -210,7 +281,7 @@ export class ActivityLogger {
   }
 
   /**
-   * Task-related events
+   * Task-related events with Korean localization
    */
   public logTaskCreated(
     taskId: string,
@@ -219,11 +290,14 @@ export class ActivityLogger {
     repositoryName: string,
     metadata?: { githubUrl?: string; branchName?: string }
   ): void {
+    const title = this.getLocalizedMessage('user_actions.task_created');
+    const description = this.getLocalizedMessage('task_created', { taskTitle, repositoryName });
+    
     this.log(
       'task',
       'info',
-      'Task created',
-      `New task "${taskTitle}" created for ${repositoryName}`,
+      title,
+      description,
       {
         taskId,
         taskTitle,
@@ -237,11 +311,14 @@ export class ActivityLogger {
   }
 
   public logTaskStarted(taskId: string, taskTitle: string): void {
+    const title = this.getLocalizedMessage('user_actions.task_started');
+    const description = this.getLocalizedMessage('task_started', { taskTitle });
+    
     this.log(
       'task',
       'info',
-      'Task started',
-      `Task "${taskTitle}" execution started`,
+      title,
+      description,
       {
         taskId,
         taskTitle,
@@ -252,11 +329,14 @@ export class ActivityLogger {
   }
 
   public logTaskCompleted(taskId: string, taskTitle: string, duration?: number): void {
+    const title = this.getLocalizedMessage('user_actions.task_completed');
+    const description = this.getLocalizedMessage('task_completed', { taskTitle });
+    
     this.log(
       'task',
       'success',
-      'Task completed',
-      `Task "${taskTitle}" completed successfully`,
+      title,
+      description,
       {
         taskId,
         taskTitle,
@@ -268,11 +348,14 @@ export class ActivityLogger {
   }
 
   public logTaskFailed(taskId: string, taskTitle: string, error: string): void {
+    const title = this.getLocalizedMessage('user_actions.task_failed');
+    const description = this.getLocalizedMessage('task_failed', { taskTitle, error });
+    
     this.log(
       'task',
       'error',
-      'Task failed',
-      `Task "${taskTitle}" failed: ${error}`,
+      title,
+      description,
       {
         taskId,
         taskTitle,
@@ -283,8 +366,26 @@ export class ActivityLogger {
     );
   }
 
+  public logTaskCancelled(taskId: string, taskTitle: string): void {
+    const title = this.getLocalizedMessage('user_actions.task_cancelled');
+    const description = this.getLocalizedMessage('task_cancelled', { taskTitle });
+    
+    this.log(
+      'task',
+      'warning',
+      title,
+      description,
+      {
+        taskId,
+        taskTitle,
+        taskStatus: 'cancelled',
+        userAction: ACTIVITY_EVENTS.TASK_CANCELLED
+      }
+    );
+  }
+
   /**
-   * GitHub-related events
+   * GitHub-related events with Korean localization
    */
   public logGitHubSync(repositoryName: string, type: 'started' | 'completed' | 'failed', details?: { duration?: number; apiCallCount?: number; error?: string }): void {
     const level: ActivityLevel = type === 'failed' ? 'error' : type === 'completed' ? 'success' : 'info';
@@ -292,11 +393,16 @@ export class ActivityLogger {
                    type === 'completed' ? ACTIVITY_EVENTS.GITHUB_SYNC_COMPLETED : 
                    ACTIVITY_EVENTS.GITHUB_SYNC_FAILED;
 
+    const titleKey = `user_actions.github_sync_${type}`;
+    const descriptionKey = `github_sync_${type}`;
+    const title = this.getLocalizedMessage(titleKey);
+    const description = this.getLocalizedMessage(descriptionKey, { repositoryName });
+
     this.log(
       'github',
       level,
-      `GitHub sync ${type}`,
-      `GitHub synchronization ${type} for ${repositoryName}`,
+      title,
+      description,
       {
         repositoryName,
         userAction: action,
@@ -308,11 +414,14 @@ export class ActivityLogger {
   }
 
   public logGitHubApiCall(endpoint: string, method: string, rateLimitRemaining?: number): void {
+    const title = this.getLocalizedMessage('user_actions.github_api_call');
+    const description = this.getLocalizedMessage('github_api_call', { method, endpoint });
+    
     this.log(
       'github',
       'info',
-      'GitHub API call',
-      `${method} ${endpoint}`,
+      title,
+      description,
       {
         userAction: ACTIVITY_EVENTS.GITHUB_API_CALL,
         rateLimitRemaining,
@@ -325,11 +434,16 @@ export class ActivityLogger {
     const level: ActivityLevel = remaining < 100 ? 'error' : remaining < 500 ? 'warning' : 'info';
     const action = remaining === 0 ? ACTIVITY_EVENTS.GITHUB_RATE_LIMIT_EXCEEDED : ACTIVITY_EVENTS.GITHUB_RATE_LIMIT_WARNING;
     
+    const title = remaining === 0 ? 
+      this.getLocalizedMessage('github_rate_limit_exceeded') :
+      this.getLocalizedMessage('github_rate_limit_warning');
+    const description = this.getLocalizedMessage('github_rate_limit', { remaining, resetTime });
+    
     this.log(
       'github',
       level,
-      'GitHub rate limit',
-      `GitHub API rate limit: ${remaining} requests remaining. Resets at ${resetTime}`,
+      title,
+      description,
       {
         rateLimitRemaining: remaining,
         userAction: action,
@@ -339,16 +453,19 @@ export class ActivityLogger {
   }
 
   /**
-   * Navigation events
+   * Navigation events with Korean localization
    */
   public logTabSwitch(previousTab: string, currentTab: string, repositoryName?: string): void {
+    const title = this.getLocalizedMessage('user_actions.tab_switched');
+    const description = repositoryName 
+      ? this.getLocalizedMessage('tab_switched', { previousTab, currentTab, repositoryName })
+      : this.getLocalizedMessage('tab_switched', { previousTab, currentTab, repositoryName: '' });
+    
     this.log(
       'navigation',
       'info',
-      'Tab switched',
-      repositoryName 
-        ? `Switched from ${previousTab} to ${currentTab} tab in ${repositoryName}` 
-        : `Switched from ${previousTab} to ${currentTab} tab`,
+      title,
+      description,
       {
         previousTab,
         currentTab,
@@ -359,11 +476,16 @@ export class ActivityLogger {
   }
 
   public logWorkspaceAccess(repositoryName: string, action: 'opened' | 'closed'): void {
+    const titleKey = `user_actions.workspace_${action}`;
+    const descriptionKey = `workspace_${action}`;
+    const title = this.getLocalizedMessage(titleKey);
+    const description = this.getLocalizedMessage(descriptionKey, { repositoryName });
+    
     this.log(
       'navigation',
       'info',
-      `Workspace ${action}`,
-      `${action === 'opened' ? 'Accessed' : 'Closed'} workspace for ${repositoryName}`,
+      title,
+      description,
       {
         repositoryName,
         userAction: action === 'opened' ? ACTIVITY_EVENTS.WORKSPACE_OPENED : ACTIVITY_EVENTS.WORKSPACE_CLOSED

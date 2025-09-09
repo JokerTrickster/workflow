@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Repository } from '../../../domain/entities/Repository';
 import { ActivityLogger } from '../../../services/ActivityLogger';
 import { ActivityLog, ActivityType, ActivityLevel } from '../../../types/activity';
+import { useI18n } from '../../../contexts/I18nContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
@@ -82,6 +83,7 @@ const getActivityBadgeColor = (type: ActivityType): string => {
 };
 
 export function LogsTab({ repository }: LogsTabProps) {
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<ActivityType | 'all'>('all');
   const [selectedDateRange, setSelectedDateRange] = useState<string>('24h');
@@ -92,6 +94,11 @@ export function LogsTab({ repository }: LogsTabProps) {
   } | null>(null);
   
   const activityLogger = ActivityLogger.getInstance();
+
+  // Initialize ActivityLogger with translation function
+  useEffect(() => {
+    activityLogger.setTranslationFunction(t);
+  }, [t, activityLogger]);
 
   // Subscribe to activity logger updates
   useEffect(() => {
@@ -185,7 +192,7 @@ export function LogsTab({ repository }: LogsTabProps) {
   };
 
   const handleClearLogs = () => {
-    if (confirm('Are you sure you want to clear all activity logs? This action cannot be undone.')) {
+    if (confirm(t('logs.clearConfirmation'))) {
       activityLogger.clearLogs();
     }
   };
@@ -197,7 +204,7 @@ export function LogsTab({ repository }: LogsTabProps) {
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            Activity Logs
+            {t('logs.title')}
           </h2>
           {stats && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -216,7 +223,7 @@ export function LogsTab({ repository }: LogsTabProps) {
             disabled={filteredLogs.length === 0}
           >
             <Download className="h-4 w-4 mr-2" />
-            Export
+            {t('logs.exportTitle')}
           </Button>
           <Button 
             variant="outline" 
@@ -226,7 +233,7 @@ export function LogsTab({ repository }: LogsTabProps) {
             className="text-red-600 hover:text-red-700 hover:bg-red-50"
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Clear
+            {t('logs.clearTitle')}
           </Button>
         </div>
       </div>
@@ -236,7 +243,7 @@ export function LogsTab({ repository }: LogsTabProps) {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Filter className="h-4 w-4" />
-            Filters
+            {t('common.filter')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -245,7 +252,7 @@ export function LogsTab({ repository }: LogsTabProps) {
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search activity logs..."
+                placeholder={t('logs.search')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -255,28 +262,28 @@ export function LogsTab({ repository }: LogsTabProps) {
             {/* Activity Type Filter */}
             <Select value={selectedType} onValueChange={(value) => setSelectedType(value as ActivityType)}>
               <SelectTrigger>
-                <SelectValue placeholder="Filter by type" />
+                <SelectValue placeholder={t('logs.filterByType')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Activities</SelectItem>
-                <SelectItem value="connection">Connection</SelectItem>
-                <SelectItem value="task">Tasks</SelectItem>
-                <SelectItem value="github">GitHub</SelectItem>
-                <SelectItem value="navigation">Navigation</SelectItem>
+                <SelectItem value="all">{t('logs.types.all')}</SelectItem>
+                <SelectItem value="connection">{t('logs.types.connection')}</SelectItem>
+                <SelectItem value="task">{t('logs.types.task')}</SelectItem>
+                <SelectItem value="github">{t('logs.types.github')}</SelectItem>
+                <SelectItem value="navigation">{t('logs.types.navigation')}</SelectItem>
               </SelectContent>
             </Select>
             
             {/* Date Range Filter */}
             <Select value={selectedDateRange} onValueChange={setSelectedDateRange}>
               <SelectTrigger>
-                <SelectValue placeholder="Select time range" />
+                <SelectValue placeholder={t('logs.selectTimeRange')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1h">Last Hour</SelectItem>
-                <SelectItem value="24h">Last 24 Hours</SelectItem>
-                <SelectItem value="7d">Last 7 Days</SelectItem>
-                <SelectItem value="30d">Last 30 Days</SelectItem>
-                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="1h">{t('logs.timeRanges.lastHour')}</SelectItem>
+                <SelectItem value="24h">{t('logs.timeRanges.last24Hours')}</SelectItem>
+                <SelectItem value="7d">{t('logs.timeRanges.last7Days')}</SelectItem>
+                <SelectItem value="30d">{t('logs.timeRanges.last30Days')}</SelectItem>
+                <SelectItem value="all">{t('logs.timeRanges.allTime')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -289,11 +296,11 @@ export function LogsTab({ repository }: LogsTabProps) {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Activity className="h-12 w-12 mb-4 opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">No activity logs found</h3>
+              <h3 className="text-lg font-semibold mb-2">{t('logs.noLogs')}</h3>
               <p className="text-sm text-muted-foreground text-center">
                 {searchQuery || selectedType !== 'all' || selectedDateRange !== '24h'
-                  ? 'Try adjusting your filters to see more results'
-                  : 'Activity logs will appear here when tasks are executed and repository interactions occur'
+                  ? t('logs.noLogsMessage')
+                  : t('logs.noLogsMessage')
                 }
               </p>
             </CardContent>
@@ -301,7 +308,10 @@ export function LogsTab({ repository }: LogsTabProps) {
         ) : (
           <>
             <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-              <span>Showing {filteredLogs.length} log{filteredLogs.length === 1 ? '' : 's'}</span>
+              <span>{t('logs.showingLogs', { 
+                count: filteredLogs.length, 
+                pluralSuffix: filteredLogs.length === 1 ? '' : 's' 
+              })}</span>
             </div>
             
             {filteredLogs.map((log, index) => (

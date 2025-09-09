@@ -114,6 +114,7 @@ export const enMessages: TranslationMessages = {
     no: 'No',
     settings: 'Settings',
     language: 'Language',
+    filter: 'Filters',
   },
   
   // Error messages
@@ -137,5 +138,82 @@ export const enMessages: TranslationMessages = {
     connected: 'Connected successfully',
     disconnected: 'Disconnected successfully',
     refreshed: 'Refreshed successfully',
+  },
+
+  // Activity logging messages
+  logs: {
+    title: 'Activity Logs',
+    noLogs: 'No activity logs found',
+    noLogsMessage: 'Try adjusting your filters to see more results or activity logs will appear here when tasks are executed and repository interactions occur',
+    showingLogs: 'Showing {{count}} log{{pluralSuffix}}',
+    exportTitle: 'Export',
+    clearTitle: 'Clear',
+    clearConfirmation: 'Are you sure you want to clear all activity logs? This action cannot be undone.',
+    search: 'Search activity logs...',
+    filterByType: 'Filter by type',
+    selectTimeRange: 'Select time range',
+    
+    // Time ranges
+    timeRanges: {
+      lastHour: 'Last Hour',
+      last24Hours: 'Last 24 Hours', 
+      last7Days: 'Last 7 Days',
+      last30Days: 'Last 30 Days',
+      allTime: 'All Time'
+    },
+
+    // Activity types
+    types: {
+      all: 'All Activities',
+      connection: 'Connection',
+      task: 'Tasks',
+      github: 'GitHub',
+      navigation: 'Navigation'
+    },
+
+    // Repository connection messages
+    repository_connected: 'Successfully connected to {{repositoryName}} repository',
+    repository_disconnected: 'Disconnected from {{repositoryName}} repository',
+    repository_connection_failed: 'Failed to connect to {{repositoryName}}: {{error}}',
+
+    // Task messages
+    task_created: 'New task "{{taskTitle}}" created for {{repositoryName}}',
+    task_started: 'Task "{{taskTitle}}" execution started',
+    task_completed: 'Task "{{taskTitle}}" completed successfully',
+    task_failed: 'Task "{{taskTitle}}" failed: {{error}}',
+    task_cancelled: 'Task "{{taskTitle}}" was cancelled',
+
+    // GitHub messages
+    github_sync_started: 'GitHub synchronization started for {{repositoryName}}',
+    github_sync_completed: 'GitHub synchronization completed for {{repositoryName}}',
+    github_sync_failed: 'GitHub synchronization failed for {{repositoryName}}',
+    github_api_call: 'GitHub API call: {{method}} {{endpoint}}',
+    github_rate_limit: 'GitHub API rate limit: {{remaining}} requests remaining. Resets at {{resetTime}}',
+    github_rate_limit_warning: 'GitHub API rate limit will be exceeded soon',
+    github_rate_limit_exceeded: 'GitHub API rate limit exceeded',
+
+    // Navigation messages
+    tab_switched: 'Switched from {{previousTab}} to {{currentTab}} tab in {{repositoryName}}',
+    workspace_opened: 'Accessed workspace for {{repositoryName}}',
+    workspace_closed: 'Closed workspace for {{repositoryName}}',
+
+    // User actions
+    user_actions: {
+      repository_connected: 'Repository Connected',
+      repository_disconnected: 'Repository Disconnected',
+      repository_connection_failed: 'Repository Connection Failed',
+      task_created: 'Task Created',
+      task_started: 'Task Started',
+      task_completed: 'Task Completed',
+      task_failed: 'Task Failed',
+      task_cancelled: 'Task Cancelled',
+      github_sync_started: 'GitHub Sync Started',
+      github_sync_completed: 'GitHub Sync Completed',
+      github_sync_failed: 'GitHub Sync Failed',
+      github_api_call: 'GitHub API Call',
+      tab_switched: 'Tab Switched',
+      workspace_opened: 'Workspace Opened',
+      workspace_closed: 'Workspace Closed',
+    }
   },
 };

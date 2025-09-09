@@ -120,6 +120,9 @@ export interface TranslationMessages {
     confirm: string;
     yes: string;
     no: string;
+    settings: string;
+    language: string;
+    filter: string;
   };
   
   // Error messages
@@ -143,6 +146,83 @@ export interface TranslationMessages {
     connected: string;
     disconnected: string;
     refreshed: string;
+  };
+
+  // Activity logging messages
+  logs: {
+    title: string;
+    noLogs: string;
+    noLogsMessage: string;
+    showingLogs: string;
+    exportTitle: string;
+    clearTitle: string;
+    clearConfirmation: string;
+    search: string;
+    filterByType: string;
+    selectTimeRange: string;
+    
+    // Time ranges
+    timeRanges: {
+      lastHour: string;
+      last24Hours: string;
+      last7Days: string;
+      last30Days: string;
+      allTime: string;
+    };
+
+    // Activity types
+    types: {
+      all: string;
+      connection: string;
+      task: string;
+      github: string;
+      navigation: string;
+    };
+
+    // Repository connection messages
+    repository_connected: string;
+    repository_disconnected: string;
+    repository_connection_failed: string;
+
+    // Task messages
+    task_created: string;
+    task_started: string;
+    task_completed: string;
+    task_failed: string;
+    task_cancelled: string;
+
+    // GitHub messages
+    github_sync_started: string;
+    github_sync_completed: string;
+    github_sync_failed: string;
+    github_api_call: string;
+    github_rate_limit: string;
+    github_rate_limit_warning: string;
+    github_rate_limit_exceeded: string;
+
+    // Navigation messages
+    tab_switched: string;
+    workspace_opened: string;
+    workspace_closed: string;
+
+    // User actions
+    user_actions: {
+      repository_connected: string;
+      repository_disconnected: string;
+      repository_connection_failed: string;
+      task_created: string;
+      task_started: string;
+      task_completed: string;
+      task_failed: string;
+      task_cancelled: string;
+      github_sync_started: string;
+      github_sync_completed: string;
+      github_sync_failed: string;
+      github_api_call: string;
+      tab_switched: string;
+      workspace_opened: string;
+      workspace_closed: string;
+    };
   };
 }
 

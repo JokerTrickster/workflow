@@ -114,6 +114,7 @@ export const koMessages: TranslationMessages = {
     no: '아니오',
     settings: '설정',
     language: '언어',
+    filter: '필터',
   },
   
   // Error messages
@@ -137,5 +138,82 @@ export const koMessages: TranslationMessages = {
     connected: '연결되었습니다',
     disconnected: '연결이 해제되었습니다',
     refreshed: '새로고침되었습니다',
+  },
+
+  // Activity logging messages
+  logs: {
+    title: '활동 로그',
+    noLogs: '활동 로그가 없습니다',
+    noLogsMessage: '필터를 조정하시거나 작업과 저장소 상호작용이 발생하면 활동 로그가 나타납니다',
+    showingLogs: '{{count}}개의 로그를 표시하고 있습니다',
+    exportTitle: '내보내기',
+    clearTitle: '지우기',
+    clearConfirmation: '모든 활동 로그를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+    search: '활동 로그 검색...',
+    filterByType: '유형별 필터',
+    selectTimeRange: '시간 범위 선택',
+    
+    // Time ranges
+    timeRanges: {
+      lastHour: '지난 1시간',
+      last24Hours: '지난 24시간',
+      last7Days: '지난 7일',
+      last30Days: '지난 30일',
+      allTime: '전체 기간'
+    },
+
+    // Activity types
+    types: {
+      all: '모든 활동',
+      connection: '연결',
+      task: '작업',
+      github: 'GitHub',
+      navigation: '탐색'
+    },
+
+    // Repository connection messages
+    repository_connected: '{{repositoryName}} 저장소에 성공적으로 연결되었습니다',
+    repository_disconnected: '{{repositoryName}} 저장소 연결이 해제되었습니다',
+    repository_connection_failed: '{{repositoryName}} 저장소 연결에 실패했습니다: {{error}}',
+
+    // Task messages
+    task_created: '{{repositoryName}}에 새 작업 "{{taskTitle}}"이 생성되었습니다',
+    task_started: '"{{taskTitle}}" 작업 실행이 시작되었습니다',
+    task_completed: '"{{taskTitle}}" 작업이 성공적으로 완료되었습니다',
+    task_failed: '"{{taskTitle}}" 작업이 실패했습니다: {{error}}',
+    task_cancelled: '"{{taskTitle}}" 작업이 취소되었습니다',
+
+    // GitHub messages
+    github_sync_started: '{{repositoryName}}에 대한 GitHub 동기화가 시작되었습니다',
+    github_sync_completed: '{{repositoryName}}에 대한 GitHub 동기화가 완료되었습니다',
+    github_sync_failed: '{{repositoryName}}에 대한 GitHub 동기화가 실패했습니다',
+    github_api_call: 'GitHub API 호출: {{method}} {{endpoint}}',
+    github_rate_limit: 'GitHub API 속도 제한: {{remaining}}개 요청 남음. {{resetTime}}에 재설정',
+    github_rate_limit_warning: 'GitHub API 속도 제한이 곧 초과됩니다',
+    github_rate_limit_exceeded: 'GitHub API 속도 제한이 초과되었습니다',
+
+    // Navigation messages
+    tab_switched: '{{repositoryName}}에서 {{previousTab}} 탭에서 {{currentTab}} 탭으로 전환',
+    workspace_opened: '{{repositoryName}} 작업공간에 접근했습니다',
+    workspace_closed: '{{repositoryName}} 작업공간을 닫았습니다',
+
+    // User actions
+    user_actions: {
+      repository_connected: '저장소 연결',
+      repository_disconnected: '저장소 연결 해제',
+      repository_connection_failed: '저장소 연결 실패',
+      task_created: '작업 생성',
+      task_started: '작업 시작',
+      task_completed: '작업 완료',
+      task_failed: '작업 실패',
+      task_cancelled: '작업 취소',
+      github_sync_started: 'GitHub 동기화 시작',
+      github_sync_completed: 'GitHub 동기화 완료',
+      github_sync_failed: 'GitHub 동기화 실패',
+      github_api_call: 'GitHub API 호출',
+      tab_switched: '탭 전환',
+      workspace_opened: '작업공간 열기',
+      workspace_closed: '작업공간 닫기',
+    }
   },
 };
