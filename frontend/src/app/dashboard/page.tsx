@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Header } from '../../components/Header';
 import { RepositoryCard } from '../../presentation/components/RepositoryCard';
 import { WorkspacePanel } from '../../presentation/components/WorkspacePanel';
 import { SearchFilter } from '../../presentation/components/SearchFilter';
+import { VirtualRepositoryGrid } from '../../presentation/components/VirtualRepositoryGrid';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -50,18 +51,18 @@ export default function Dashboard() {
     firstRepo: repositories?.[0]?.name
   });
 
-  // Handle repository selection
-  const handleRepositorySelect = (repository: Repository) => {
+  // Handle repository selection - memoized to prevent re-renders
+  const handleRepositorySelect = useCallback((repository: Repository) => {
     setSelectedRepository(repository);
-  };
+  }, []);
 
-  // Handle closing workspace
-  const handleCloseWorkspace = () => {
+  // Handle closing workspace - memoized
+  const handleCloseWorkspace = useCallback(() => {
     setSelectedRepository(null);
-  };
+  }, []);
 
-  // Handle repository connection
-  const handleRepositoryConnect = async (repositoryId: number) => {
+  // Handle repository connection - memoized
+  const handleRepositoryConnect = useCallback(async (repositoryId: number) => {
     console.log('Connecting repository:', repositoryId);
     try {
       await connectRepository(repositoryId);
@@ -69,22 +70,26 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Failed to connect repository:', error);
     }
-  };
+  }, [connectRepository]);
 
-  // Filter repositories based on search and filters
-  const filteredRepositories = repositories?.filter((repo) => {
-    const matchesSearch = !searchQuery || 
-      repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      repo.description?.toLowerCase().includes(searchQuery.toLowerCase());
+  // Filter repositories based on search and filters - memoized for performance
+  const filteredRepositories = useMemo(() => {
+    if (!repositories) return [];
     
-    const matchesLanguage = !languageFilter || repo.language === languageFilter;
-    
-    const matchesConnection = connectionFilter === 'all' || 
-      (connectionFilter === 'connected' && repo.is_connected) ||
-      (connectionFilter === 'disconnected' && !repo.is_connected);
-    
-    return matchesSearch && matchesLanguage && matchesConnection;
-  }) || [];
+    return repositories.filter((repo) => {
+      const matchesSearch = !searchQuery || 
+        repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        repo.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesLanguage = !languageFilter || repo.language === languageFilter;
+      
+      const matchesConnection = connectionFilter === 'all' || 
+        (connectionFilter === 'connected' && repo.is_connected) ||
+        (connectionFilter === 'disconnected' && !repo.is_connected);
+      
+      return matchesSearch && matchesLanguage && matchesConnection;
+    });
+  }, [repositories, searchQuery, languageFilter, connectionFilter]);
   
   console.log('🔍 Filter results:', {
     totalRepos: repositories?.length || 0,
@@ -95,13 +100,17 @@ export default function Dashboard() {
     firstFilteredRepo: filteredRepositories[0]?.name
   });
 
-  // Get unique languages for filter
-  const availableLanguages = Array.from(
-    new Set(repositories?.map(repo => repo.language).filter(Boolean) || [])
-  ).sort();
+  // Get unique languages for filter - memoized for performance
+  const availableLanguages = useMemo(() => {
+    if (!repositories) return [];
+    
+    return Array.from(
+      new Set(repositories.map(repo => repo.language).filter(Boolean))
+    ).sort();
+  }, [repositories]);
 
-  // Handle retry for different error scenarios
-  const handleRetry = () => {
+  // Handle retry for different error scenarios - memoized
+  const handleRetry = useCallback(() => {
     if (!isOnline) {
       // For offline scenarios, just show a message about connectivity
       alert('Please check your internet connection and try again.');
@@ -109,7 +118,7 @@ export default function Dashboard() {
     }
     
     refetchRepositories();
-  };
+  }, [isOnline, refetchRepositories]);
 
   // Show workspace if a repository is selected
   if (selectedRepository) {
@@ -379,7 +388,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Repository Grid */}
+            {/* Virtual Repository Grid */}
             {!isLoading && !error && filteredRepositories.length > 0 && (
               <ErrorBoundary 
                 level="component"
@@ -407,17 +416,13 @@ export default function Dashboard() {
                   </Card>
                 )}
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-6">
-                  {filteredRepositories.map((repository) => (
-                    <RepositoryCard
-                      key={repository.id}
-                      repository={repository}
-                      onSelect={handleRepositorySelect}
-                      onConnect={handleRepositoryConnect}
-                      isLoading={isRefetching}
-                    />
-                  ))}
-                </div>
+                <VirtualRepositoryGrid
+                  repositories={filteredRepositories}
+                  onSelect={handleRepositorySelect}
+                  onConnect={handleRepositoryConnect}
+                  isLoading={isRefetching}
+                  height={Math.min(600, filteredRepositories.length * 280)}
+                />
               </ErrorBoundary>
             )}
           </div>
