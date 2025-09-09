@@ -4,7 +4,9 @@ import { Github, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LogoutButton } from '@/components/LogoutButton'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { LanguageToggle } from '@/components/LanguageToggle'
 import { useAuth } from '@/contexts/AuthContext'
+import { useI18n } from '@/contexts/I18nContext'
 
 interface HeaderProps {
   title: string
@@ -22,6 +24,7 @@ export function Header({
   children 
 }: HeaderProps) {
   const { user, isAuthenticated } = useAuth()
+  const { t } = useI18n()
 
   return (
     <header className="border-b bg-background">
@@ -36,6 +39,9 @@ export function Header({
             {/* Custom action buttons */}
             {children}
             
+            {/* Language toggle */}
+            <LanguageToggle />
+            
             {/* Theme toggle */}
             <ThemeToggle />
             
@@ -49,14 +55,14 @@ export function Header({
                 className="gap-2"
               >
                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
+                {t('dashboard.refresh')}
               </Button>
             )}
             
             {/* Settings button */}
             {showSettings && (
               <Button variant="outline" size="sm">
-                Settings
+                {t('common.settings', 'Settings')}
               </Button>
             )}
             
@@ -77,7 +83,7 @@ export function Header({
                 className="gap-2"
               >
                 <Github className="h-4 w-4" />
-                Sign In
+                {t('auth.signIn')}
               </Button>
             )}
           </div>
