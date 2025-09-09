@@ -11,6 +11,12 @@ import {
   GitHubIssuesRequestParams,
   GitHubPullRequestsRequestParams
 } from '@/types/github';
+import {
+  CommentType,
+  TemplateVariables,
+  KoreanCommentTemplates,
+  generateKoreanComment
+} from '@/types/korean-templates';
 
 export class GitHubApiService {
   private static async getAccessToken(): Promise<string | null> {
@@ -63,19 +69,36 @@ export class GitHubApiService {
     return links;
   }
 
-  private static async makeApiRequest(url: string, accessToken: string, retries = 3): Promise<Response> {
+  private static async makeApiRequest(
+    url: string, 
+    accessToken: string, 
+    options?: {
+      method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+      body?: string;
+      retries?: number;
+    }
+  ): Promise<Response> {
     const activityLogger = ActivityLogger.getInstance();
-    const method = 'GET'; // Most API calls are GET requests
+    const method = options?.method || 'GET';
     const endpoint = url.replace('https://api.github.com', '');
+    const retries = options?.retries || 3;
     
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
+        const headers: HeadersInit = {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'AI-Git-Workbench/1.0.0'
+        };
+
+        if (options?.body) {
+          headers['Content-Type'] = 'application/json';
+        }
+
         const response = await fetch(url, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'AI-Git-Workbench/1.0.0'
-          }
+          method,
+          headers,
+          body: options?.body
         });
 
         // Log API call and rate limit info
@@ -380,6 +403,95 @@ export class GitHubApiService {
       const duration = Date.now() - startTime;
       activityLogger.logGitHubSync(`${repoId} pull requests`, 'failed', { error: error instanceof Error ? error.message : 'Unknown error', duration });
       console.error(`Failed to fetch pull requests for repository ${repoId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a comment on a GitHub issue
+   * @param repoId - Repository ID (format: "owner/repo")
+   * @param issueNumber - Issue number
+   * @param body - Comment body (markdown supported)
+   */
+  static async createIssueComment(
+    repoId: string,
+    issueNumber: number,
+    body: string
+  ): Promise<void> {
+    const accessToken = await this.getAccessToken();
+    const activityLogger = ActivityLogger.getInstance();
+    
+    if (!accessToken) {
+      throw new Error('No GitHub access token available. Please sign in with GitHub.');
+    }
+
+    // Validate repoId format
+    if (!repoId.includes('/')) {
+      throw new Error('Repository ID must be in format "owner/repo"');
+    }
+
+    try {
+      activityLogger.logGitHubSync(`${repoId}#${issueNumber} comment`, 'started');
+      
+      const url = `https://api.github.com/repos/${repoId}/issues/${issueNumber}/comments`;
+      const requestBody = JSON.stringify({ body });
+      
+      const response = await this.makeApiRequest(url, accessToken, {
+        method: 'POST',
+        body: requestBody
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create comment: ${response.status} ${response.statusText}`);
+      }
+
+      const comment = await response.json();
+      activityLogger.logGitHubSync(`${repoId}#${issueNumber} comment`, 'completed', { 
+        commentId: comment.id 
+      });
+      
+      console.log(`✅ Successfully created comment on ${repoId}#${issueNumber}`);
+    } catch (error) {
+      activityLogger.logGitHubSync(`${repoId}#${issueNumber} comment`, 'failed', { 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      console.error(`Failed to create comment on ${repoId}#${issueNumber}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a Korean comment on a GitHub issue using templates
+   * @param repoId - Repository ID (format: "owner/repo")
+   * @param issueNumber - Issue number
+   * @param commentType - Type of Korean comment to create
+   * @param variables - Template variables for customization
+   * @param customTemplates - Custom templates (optional)
+   */
+  static async createKoreanIssueComment(
+    repoId: string,
+    issueNumber: number,
+    commentType: CommentType,
+    variables?: TemplateVariables,
+    customTemplates?: KoreanCommentTemplates
+  ): Promise<void> {
+    try {
+      const koreanComment = generateKoreanComment(commentType, variables, customTemplates);
+      await this.createIssueComment(repoId, issueNumber, koreanComment);
+      
+      const activityLogger = ActivityLogger.getInstance();
+      activityLogger.logActivity(
+        `GitHub Issue Comment`,
+        `${commentType} comment created on ${repoId}#${issueNumber}`,
+        'success'
+      );
+    } catch (error) {
+      const activityLogger = ActivityLogger.getInstance();
+      activityLogger.logActivity(
+        `GitHub Issue Comment`,
+        `Failed to create ${commentType} comment on ${repoId}#${issueNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'error'
+      );
       throw error;
     }
   }

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { QueryProvider } from "../providers/QueryProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { I18nProvider } from "@/contexts/I18nContext";
+import { ThemeProvider } from "../providers/ThemeProvider";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import "./globals.css";
 
@@ -47,13 +49,22 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ErrorBoundary level="critical" showDetails={process.env.NODE_ENV === 'development'}>
-          <AuthProvider>
-            <QueryProvider>
-              <ErrorBoundary level="page">
-                {children}
-              </ErrorBoundary>
-            </QueryProvider>
-          </AuthProvider>
+          <I18nProvider defaultLocale="ko" fallbackLocale="en">
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange={false}
+            >
+              <AuthProvider>
+                <QueryProvider>
+                  <ErrorBoundary level="page">
+                    {children}
+                  </ErrorBoundary>
+                </QueryProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </I18nProvider>
         </ErrorBoundary>
       </body>
     </html>
