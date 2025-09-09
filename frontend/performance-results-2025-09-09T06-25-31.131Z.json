@@ -1,0 +1,161 @@
+{
+  "timestamp": "2025-09-09T06:25:31.134Z",
+  "browser": "chromium",
+  "tests": [
+    {
+      "success": true,
+      "repositoryCount": 10,
+      "timestamp": "2025-09-09T06:25:11.086Z",
+      "testConfig": {
+        "repositoryCount": 10,
+        "timestamp": "2025-09-09T06:25:11.086Z",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        }
+      },
+      "renderMetrics": {},
+      "scrollMetrics": {
+        "repositoryCount": 10,
+        "averageFps": 59.4,
+        "minimumFps": -64.7,
+        "droppedFramePercentage": 0.5,
+        "totalFrames": 182,
+        "testDuration": 3000.5
+      },
+      "memoryMetrics": {
+        "usedJSHeapSize": 16,
+        "totalJSHeapSize": 20,
+        "jsHeapSizeLimit": 4096,
+        "heapUsagePercentage": 0
+      },
+      "recommendations": [
+        {
+          "category": "Scroll Performance",
+          "severity": "high",
+          "issue": "Average FPS (59.4) below 60fps target",
+          "solution": "Implement virtual scrolling for large repository lists"
+        }
+      ]
+    },
+    {
+      "success": true,
+      "repositoryCount": 50,
+      "timestamp": "2025-09-09T06:25:16.097Z",
+      "testConfig": {
+        "repositoryCount": 50,
+        "timestamp": "2025-09-09T06:25:16.097Z",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        }
+      },
+      "renderMetrics": {},
+      "scrollMetrics": {
+        "repositoryCount": 50,
+        "averageFps": 59,
+        "minimumFps": -100.2,
+        "droppedFramePercentage": 1.1,
+        "totalFrames": 181,
+        "testDuration": 3007.3000000238426
+      },
+      "memoryMetrics": {
+        "usedJSHeapSize": 16,
+        "totalJSHeapSize": 20,
+        "jsHeapSizeLimit": 4096,
+        "heapUsagePercentage": 0
+      },
+      "recommendations": [
+        {
+          "category": "Scroll Performance",
+          "severity": "high",
+          "issue": "Average FPS (59) below 60fps target",
+          "solution": "Implement virtual scrolling for large repository lists"
+        }
+      ]
+    },
+    {
+      "success": true,
+      "repositoryCount": 100,
+      "timestamp": "2025-09-09T06:25:21.112Z",
+      "testConfig": {
+        "repositoryCount": 100,
+        "timestamp": "2025-09-09T06:25:21.113Z",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        }
+      },
+      "renderMetrics": {},
+      "scrollMetrics": {
+        "repositoryCount": 100,
+        "averageFps": 58.8,
+        "minimumFps": -126.9,
+        "droppedFramePercentage": 1.1,
+        "totalFrames": 181,
+        "testDuration": 3009.0999999999985
+      },
+      "memoryMetrics": {
+        "usedJSHeapSize": 17,
+        "totalJSHeapSize": 20,
+        "jsHeapSizeLimit": 4096,
+        "heapUsagePercentage": 0
+      },
+      "recommendations": [
+        {
+          "category": "Scroll Performance",
+          "severity": "high",
+          "issue": "Average FPS (58.8) below 60fps target",
+          "solution": "Implement virtual scrolling for large repository lists"
+        }
+      ]
+    },
+    {
+      "success": true,
+      "repositoryCount": 200,
+      "timestamp": "2025-09-09T06:25:26.128Z",
+      "testConfig": {
+        "repositoryCount": 200,
+        "timestamp": "2025-09-09T06:25:26.128Z",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+        "viewport": {
+          "width": 1920,
+          "height": 1080
+        }
+      },
+      "renderMetrics": {},
+      "scrollMetrics": {
+        "repositoryCount": 200,
+        "averageFps": 58.8,
+        "minimumFps": -131.9,
+        "droppedFramePercentage": 1.1,
+        "totalFrames": 181,
+        "testDuration": 3008.599999976159
+      },
+      "memoryMetrics": {
+        "usedJSHeapSize": 17,
+        "totalJSHeapSize": 20,
+        "jsHeapSizeLimit": 4096,
+        "heapUsagePercentage": 0
+      },
+      "recommendations": [
+        {
+          "category": "Scroll Performance",
+          "severity": "high",
+          "issue": "Average FPS (58.8) below 60fps target",
+          "solution": "Implement virtual scrolling for large repository lists"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "averageFps": 59,
+    "minimumFps": -131.9,
+    "maxDroppedFrameRate": 1.1,
+    "testsPassingTarget": "0/4",
+    "overallGrade": "NEEDS_IMPROVEMENT"
+  }
+}

@@ -5,6 +5,7 @@ import { Header } from '../../components/Header';
 import { RepositoryCard } from '../../presentation/components/RepositoryCard';
 import { WorkspacePanel } from '../../presentation/components/WorkspacePanel';
 import { SearchFilter } from '../../presentation/components/SearchFilter';
+import { VirtualRepositoryGrid } from '../../presentation/components/VirtualRepositoryGrid';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -387,7 +388,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Repository Grid */}
+            {/* Virtual Repository Grid */}
             {!isLoading && !error && filteredRepositories.length > 0 && (
               <ErrorBoundary 
                 level="component"
@@ -415,17 +416,13 @@ export default function Dashboard() {
                   </Card>
                 )}
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-6">
-                  {filteredRepositories.map((repository) => (
-                    <RepositoryCard
-                      key={repository.id}
-                      repository={repository}
-                      onSelect={handleRepositorySelect}
-                      onConnect={handleRepositoryConnect}
-                      isLoading={isRefetching}
-                    />
-                  ))}
-                </div>
+                <VirtualRepositoryGrid
+                  repositories={filteredRepositories}
+                  onSelect={handleRepositorySelect}
+                  onConnect={handleRepositoryConnect}
+                  isLoading={isRefetching}
+                  height={Math.min(600, filteredRepositories.length * 280)}
+                />
               </ErrorBoundary>
             )}
           </div>
