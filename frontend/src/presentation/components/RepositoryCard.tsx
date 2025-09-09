@@ -8,11 +8,12 @@ import { Star, GitFork, Calendar, ExternalLink } from 'lucide-react';
 
 interface RepositoryCardProps {
   repository: Repository;
+  onSelect: (repository: Repository) => void;
   onConnect: (repoId: number) => void;
-  onOpenWorkspace: (repository: Repository) => void;
+  isLoading?: boolean;
 }
 
-export function RepositoryCard({ repository, onConnect, onOpenWorkspace }: RepositoryCardProps) {
+export function RepositoryCard({ repository, onSelect, onConnect, isLoading }: RepositoryCardProps) {
   return (
     <Card className="w-full">
       <CardHeader>
@@ -69,21 +70,28 @@ export function RepositoryCard({ repository, onConnect, onOpenWorkspace }: Repos
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           {repository.is_connected ? (
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => onOpenWorkspace(repository)}
+              onClick={() => onSelect(repository)}
+              disabled={isLoading}
             >
               Open Workspace
             </Button>
           ) : (
             <Button 
               size="sm" 
-              onClick={() => onConnect(repository.id)}
+              onClick={async () => {
+                await onConnect(repository.id);
+                // After connecting, open the workspace with updated repository
+                const updatedRepository = { ...repository, is_connected: true };
+                onSelect(updatedRepository);
+              }}
+              disabled={isLoading}
             >
-              Connect Repository
+              {isLoading ? 'Connecting...' : 'Connect Repository'}
             </Button>
           )}
         </div>

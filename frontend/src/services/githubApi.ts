@@ -1,45 +1,145 @@
 import { supabase } from '@/lib/supabase/client';
 import { Repository } from '@/domain/entities/Repository';
-
-interface GitHubRepo {
-  id: number;
-  name: string;
-  full_name: string;
-  description: string | null;
-  html_url: string;
-  clone_url: string;
-  ssh_url: string;
-  private: boolean;
-  language: string | null;
-  stargazers_count: number;
-  forks_count: number;
-  created_at: string;
-  updated_at: string;
-  pushed_at: string;
-  default_branch: string;
-}
-
-interface GitHubApiResponse {
-  repositories: Repository[];
-  nextCursor?: number;
-  hasMore: boolean;
-}
+import { ActivityLogger } from './ActivityLogger';
+import {
+  GitHubRepo,
+  GitHubApiResponse,
+  GitHubIssue,
+  GitHubPullRequest,
+  GitHubIssuesResponse,
+  GitHubPullRequestsResponse,
+  GitHubIssuesRequestParams,
+  GitHubPullRequestsRequestParams
+} from '@/types/github';
 
 export class GitHubApiService {
   private static async getAccessToken(): Promise<string | null> {
+    console.log('🔑 Getting GitHub access token from Supabase session...');
     const { data: { session }, error } = await supabase.auth.getSession();
     
     if (error) {
-      console.error('Error getting session:', error);
+      console.error('❌ Error getting session:', error);
+      return null;
+    }
+
+    if (!session) {
+      console.error('❌ No session found - user not authenticated');
       return null;
     }
 
     if (!session?.provider_token) {
-      console.error('No GitHub access token found in session');
+      console.error('❌ No GitHub access token found in session');
+      console.log('Session data:', { 
+        user: session.user?.email, 
+        expires_at: session.expires_at,
+        provider_token: !!session.provider_token 
+      });
       return null;
     }
 
-    return session.provider_token;
+    console.log('✅ GitHub access token found');
+    return session.provider_token ?? null;
+  }
+
+  private static async sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private static parseLinkHeader(linkHeader: string): { first?: string; prev?: string; next?: string; last?: string } {
+    const links: { first?: string; prev?: string; next?: string; last?: string } = {};
+    
+    // Parse Link header format: <url1>; rel="next", <url2>; rel="last"
+    const parts = linkHeader.split(',');
+    for (const part of parts) {
+      const match = part.match(/<([^>]+)>;\s*rel="([^"]+)"/);
+      if (match) {
+        const [, url, rel] = match;
+        if (rel === 'first' || rel === 'prev' || rel === 'next' || rel === 'last') {
+          links[rel] = url;
+        }
+      }
+    }
+    
+    return links;
+  }
+
+  private static async makeApiRequest(url: string, accessToken: string, retries = 3): Promise<Response> {
+    const activityLogger = ActivityLogger.getInstance();
+    const method = 'GET'; // Most API calls are GET requests
+    const endpoint = url.replace('https://api.github.com', '');
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'AI-Git-Workbench/1.0.0'
+          }
+        });
+
+        // Log API call and rate limit info
+        const rateLimitRemaining = parseInt(response.headers.get('X-RateLimit-Remaining') || '0');
+        activityLogger.logGitHubApiCall(endpoint, method, rateLimitRemaining);
+
+        if (response.ok) {
+          // Log rate limit warning if needed
+          if (rateLimitRemaining <= 100) {
+            const rateLimitReset = response.headers.get('X-RateLimit-Reset');
+            const resetTime = rateLimitReset 
+              ? new Date(parseInt(rateLimitReset) * 1000).toLocaleTimeString() 
+              : 'unknown';
+            activityLogger.logGitHubRateLimit(rateLimitRemaining, resetTime);
+          }
+          return response;
+        }
+
+        if (response.status === 401) {
+          throw new Error('GitHub access token expired. Please sign in again.');
+        }
+
+        if (response.status === 403) {
+          const rateLimitReset = response.headers.get('X-RateLimit-Reset');
+          const resetTime = rateLimitReset 
+            ? new Date(parseInt(rateLimitReset) * 1000).toLocaleTimeString() 
+            : 'unknown';
+          
+          // Log rate limit exceeded
+          activityLogger.logGitHubRateLimit(0, resetTime);
+          
+          if (attempt < retries) {
+            // Wait with exponential backoff for rate limit
+            const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+            console.warn(`Rate limit hit, waiting ${waitTime}ms before retry ${attempt}/${retries}`);
+            await this.sleep(waitTime);
+            continue;
+          }
+          
+          throw new Error(`GitHub API rate limit exceeded. Resets at ${resetTime}.`);
+        }
+
+        if (response.status >= 500 && attempt < retries) {
+          // Server error, retry with exponential backoff
+          const waitTime = Math.pow(2, attempt) * 1000;
+          console.warn(`Server error ${response.status}, waiting ${waitTime}ms before retry ${attempt}/${retries}`);
+          await this.sleep(waitTime);
+          continue;
+        }
+
+        throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+      } catch (error) {
+        if (attempt === retries || error instanceof Error && error.message.includes('token expired')) {
+          throw error;
+        }
+        
+        // Network error, retry with exponential backoff
+        const waitTime = Math.pow(2, attempt) * 500;
+        console.warn(`Network error, waiting ${waitTime}ms before retry ${attempt}/${retries}:`, error);
+        await this.sleep(waitTime);
+      }
+    }
+
+    throw new Error('Max retries exceeded');
   }
 
   private static transformGitHubRepo(repo: GitHubRepo): Repository {
@@ -65,36 +165,18 @@ export class GitHubApiService {
 
   static async fetchUserRepositories(page = 1, perPage = 30): Promise<GitHubApiResponse> {
     const accessToken = await this.getAccessToken();
+    const activityLogger = ActivityLogger.getInstance();
+    const startTime = Date.now();
     
     if (!accessToken) {
       throw new Error('No GitHub access token available. Please sign in with GitHub.');
     }
 
     try {
-      const response = await fetch(
-        `https://api.github.com/user/repos?page=${page}&per_page=${perPage}&sort=updated&type=all`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'AI-Git-Workbench/1.0.0'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('GitHub access token expired. Please sign in again.');
-        }
-        if (response.status === 403) {
-          const rateLimitReset = response.headers.get('X-RateLimit-Reset');
-          const resetTime = rateLimitReset 
-            ? new Date(parseInt(rateLimitReset) * 1000).toLocaleTimeString() 
-            : 'unknown';
-          throw new Error(`GitHub API rate limit exceeded. Resets at ${resetTime}.`);
-        }
-        throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-      }
+      activityLogger.logGitHubSync('user repositories', 'started');
+      
+      const url = `https://api.github.com/user/repos?page=${page}&per_page=${perPage}&sort=updated&type=all`;
+      const response = await this.makeApiRequest(url, accessToken);
 
       const repos: GitHubRepo[] = await response.json();
       const transformedRepos = repos.map(this.transformGitHubRepo);
@@ -103,12 +185,17 @@ export class GitHubApiService {
       const linkHeader = response.headers.get('Link');
       const hasNext = linkHeader?.includes('rel="next"') || false;
 
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync('user repositories', 'completed', { duration, apiCallCount: 1 });
+
       return {
         repositories: transformedRepos,
         nextCursor: hasNext ? page + 1 : undefined,
         hasMore: hasNext
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync('user repositories', 'failed', { error: error instanceof Error ? error.message : 'Unknown error', duration });
       console.error('Failed to fetch repositories from GitHub:', error);
       throw error;
     }
@@ -122,21 +209,177 @@ export class GitHubApiService {
     }
 
     try {
-      const response = await fetch('https://api.github.com/user', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'AI-Git-Workbench/1.0.0'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-      }
+      const url = 'https://api.github.com/user';
+      const response = await this.makeApiRequest(url, accessToken);
 
       return await response.json();
     } catch (error) {
       console.error('Failed to fetch user profile from GitHub:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch issues for a specific repository
+   * @param repoId - Repository ID (format: "owner/repo" e.g., "facebook/react")
+   * @param params - Optional parameters for filtering and pagination
+   */
+  static async fetchRepositoryIssues(
+    repoId: string, 
+    params: Partial<GitHubIssuesRequestParams> = {}
+  ): Promise<GitHubIssuesResponse> {
+    // Set defaults
+    const {
+      page = 1,
+      per_page = 30,
+      state = 'open',
+      sort = 'updated',
+      direction = 'desc',
+      ...otherParams
+    } = params;
+    const accessToken = await this.getAccessToken();
+    const activityLogger = ActivityLogger.getInstance();
+    const startTime = Date.now();
+    
+    if (!accessToken) {
+      throw new Error('No GitHub access token available. Please sign in with GitHub.');
+    }
+
+    // Validate repoId format
+    if (!repoId.includes('/')) {
+      throw new Error('Repository ID must be in format "owner/repo"');
+    }
+
+    try {
+      activityLogger.logGitHubSync(`${repoId} issues`, 'started');
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        per_page: per_page.toString(),
+        state,
+        sort,
+        direction,
+        ...Object.fromEntries(
+          Object.entries(otherParams).map(([key, value]) => [
+            key, 
+            Array.isArray(value) ? value.join(',') : String(value)
+          ])
+        )
+      });
+
+      const url = `https://api.github.com/repos/${repoId}/issues?${queryParams}`;
+      const response = await this.makeApiRequest(url, accessToken);
+
+      const issues: GitHubIssue[] = await response.json();
+      
+      // Filter out pull requests (GitHub API returns PRs as issues)
+      const filteredIssues = issues.filter(issue => !issue.html_url.includes('/pull/'));
+
+      // Parse pagination metadata from headers
+      const linkHeader = response.headers.get('Link');
+      const hasNext = linkHeader?.includes('rel="next"') || false;
+
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync(`${repoId} issues`, 'completed', { duration, apiCallCount: 1 });
+
+      return {
+        issues: filteredIssues,
+        nextCursor: hasNext ? page + 1 : undefined,
+        hasMore: hasNext,
+        pagination: {
+          page,
+          per_page,
+          has_next_page: hasNext,
+          has_previous_page: page > 1
+        },
+        links: linkHeader ? this.parseLinkHeader(linkHeader) : undefined
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync(`${repoId} issues`, 'failed', { error: error instanceof Error ? error.message : 'Unknown error', duration });
+      console.error(`Failed to fetch issues for repository ${repoId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch pull requests for a specific repository
+   * @param repoId - Repository ID (format: "owner/repo" e.g., "facebook/react")
+   * @param params - Optional parameters for filtering and pagination
+   */
+  static async fetchRepositoryPullRequests(
+    repoId: string, 
+    params: Partial<GitHubPullRequestsRequestParams> = {}
+  ): Promise<GitHubPullRequestsResponse> {
+    // Set defaults
+    const {
+      page = 1,
+      per_page = 30,
+      state = 'open',
+      sort = 'updated',
+      direction = 'desc',
+      ...otherParams
+    } = params;
+    const accessToken = await this.getAccessToken();
+    const activityLogger = ActivityLogger.getInstance();
+    const startTime = Date.now();
+    
+    if (!accessToken) {
+      throw new Error('No GitHub access token available. Please sign in with GitHub.');
+    }
+
+    // Validate repoId format
+    if (!repoId.includes('/')) {
+      throw new Error('Repository ID must be in format "owner/repo"');
+    }
+
+    try {
+      activityLogger.logGitHubSync(`${repoId} pull requests`, 'started');
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        per_page: per_page.toString(),
+        state,
+        sort,
+        direction,
+        ...Object.fromEntries(
+          Object.entries(otherParams).map(([key, value]) => [
+            key, 
+            Array.isArray(value) ? value.join(',') : String(value)
+          ])
+        )
+      });
+
+      const url = `https://api.github.com/repos/${repoId}/pulls?${queryParams}`;
+      const response = await this.makeApiRequest(url, accessToken);
+
+      const pullRequests: GitHubPullRequest[] = await response.json();
+
+      // Parse pagination metadata from headers
+      const linkHeader = response.headers.get('Link');
+      const hasNext = linkHeader?.includes('rel="next"') || false;
+
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync(`${repoId} pull requests`, 'completed', { duration, apiCallCount: 1 });
+
+      return {
+        pullRequests,
+        nextCursor: hasNext ? page + 1 : undefined,
+        hasMore: hasNext,
+        pagination: {
+          page,
+          per_page,
+          has_next_page: hasNext,
+          has_previous_page: page > 1
+        },
+        links: linkHeader ? this.parseLinkHeader(linkHeader) : undefined
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      activityLogger.logGitHubSync(`${repoId} pull requests`, 'failed', { error: error instanceof Error ? error.message : 'Unknown error', duration });
+      console.error(`Failed to fetch pull requests for repository ${repoId}:`, error);
       throw error;
     }
   }

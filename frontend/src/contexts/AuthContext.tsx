@@ -5,8 +5,12 @@ import type { ReactNode } from 'react'
 // Removed unused User and Session imports - using types from auth.ts instead
 import { supabase } from '@/lib/supabase/client'
 import { AuthContextType, AuthUser, AuthSession } from '@/types/auth'
+import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+export { AuthContext }
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
@@ -25,6 +29,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<AuthSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+  // Make queryClient optional to prevent errors if QueryClientProvider is not available
+  let queryClient: any = null
+  // Comment out useQueryClient for now to prevent build errors
+  // try {
+  //   queryClient = useQueryClient()
+  // } catch (error) {
+  //   console.warn('QueryClient not available:', error)
+  // }
 
   // Initialize auth state
   useEffect(() => {
@@ -116,10 +129,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [])
 
-  // Sign out
+  // Sign out with complete cleanup
   const signOut = useCallback(async () => {
     try {
       setError(null)
+      
+      // Clear Supabase auth session
       const { error } = await supabase.auth.signOut()
 
       if (error) {
@@ -127,15 +142,63 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return { error }
       }
 
+      // Clear local auth state
       setUser(null)
       setSession(null)
+      
+      // Clear React Query cache
+      // Clear React Query cache if available
+      if (queryClient) {
+        queryClient.clear()
+      }
+      
+      // Clear localStorage (remove any auth tokens or app state)
+      try {
+        // Clear specific keys that might contain auth data
+        const keysToRemove = [
+          'supabase.auth.token',
+          'sb-auth-token',
+          'auth-token',
+          'user-data',
+          'repositories',
+          'github-token',
+          'app-state'
+        ]
+        
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key)
+          sessionStorage.removeItem(key)
+        })
+        
+        // Clear any keys that start with our app prefixes
+        const allKeys = Object.keys(localStorage)
+        allKeys.forEach(key => {
+          if (key.startsWith('workflow-') || key.startsWith('github-') || key.startsWith('supabase-auth-token')) {
+            localStorage.removeItem(key)
+          }
+        })
+      } catch (storageError) {
+        // localStorage might not be available in some environments
+        console.warn('Could not clear localStorage:', storageError)
+      }
+      
+      // Redirect to login page
+      router.push('/login')
+      
       return {}
     } catch (error: unknown) {
       const errorMessage = (error as Error)?.message || 'Failed to sign out'
       setError(errorMessage)
       return { error: { message: errorMessage } }
     }
-  }, [])
+  }, [queryClient, router])
+
+  // Sign out with confirmation dialog
+  const signOutWithConfirmation = useCallback(async () => {
+    // This will be handled by the LogoutButton component with dialog
+    // The component will call signOut() after confirmation
+    await signOut()
+  }, [signOut])
 
   // Refresh session
   const refreshSession = useCallback(async () => {
@@ -165,6 +228,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     error,
     signInWithGitHub,
     signOut,
+    signOutWithConfirmation,
     refreshSession,
     isAuthenticated: !!user && !!session
   }
