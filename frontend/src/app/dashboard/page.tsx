@@ -10,6 +10,7 @@ import { ErrorTestPanel } from '../../components/ErrorTestPanel';
 import { RepositoryCard } from '../../presentation/components/RepositoryCard';
 import { SearchFilter } from '../../presentation/components/SearchFilter';
 import { WorkspacePanel } from '../../presentation/components/WorkspacePanel';
+import { Header } from '../../components/Header';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Github, Plus, RefreshCw } from 'lucide-react';
@@ -257,16 +258,7 @@ export default function DashboardPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b">
-          <div className="container mx-auto max-w-7xl px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Github className="h-8 w-8" />
-                <h1 className="text-2xl font-bold">Repository Dashboard</h1>
-              </div>
-            </div>
-          </div>
-        </header>
+        <Header title="Repository Dashboard" />
         <div className="container mx-auto max-w-7xl px-4 py-8">
           <Card className="max-w-md mx-auto">
             <CardContent className="pt-6 text-center space-y-4">
@@ -295,16 +287,7 @@ export default function DashboardPage() {
   if (recoveryError) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="border-b">
-          <div className="container mx-auto max-w-7xl px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Github className="h-8 w-8" />
-                <h1 className="text-2xl font-bold">Repository Dashboard</h1>
-              </div>
-            </div>
-          </div>
-        </header>
+        <Header title="Repository Dashboard" />
         <div className="container mx-auto max-w-7xl px-4 py-8">
           <div className="max-w-md mx-auto">
             <ErrorMessage
@@ -320,31 +303,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto max-w-7xl px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Github className="h-8 w-8" />
-              <h1 className="text-2xl font-bold">Repository Dashboard</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={isLoading}
-                className="gap-2"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-              <Button variant="outline" size="sm">
-                Settings
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header 
+        title="Repository Dashboard" 
+        onRefresh={handleRefresh}
+        isLoading={isLoading}
+        showSettings={true}
+      />
 
       <main className="container mx-auto max-w-7xl px-4 py-8">
         <div className="space-y-6">
