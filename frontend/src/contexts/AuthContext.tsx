@@ -10,6 +10,8 @@ import { useQueryClient } from '@tanstack/react-query'
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+export { AuthContext }
+
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
   if (!context) {
