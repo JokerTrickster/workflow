@@ -1,3 +1,9 @@
 # CCPM (Claude Code PM) 관련
 .claude/epics/
 .claude/settings.local.json
+
+# Build outputs
+.next/
+
+# Git worktrees
+epic-dashboard-ux-improvements/
