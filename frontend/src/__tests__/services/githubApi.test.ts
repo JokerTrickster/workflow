@@ -5,6 +5,8 @@
 
 import { GitHubApiService } from '../../services/githubApi';
 import { ErrorHandler, ErrorType } from '../../utils/errorHandler';
+import { supabase } from '@/lib/supabase/client';
+import { ActivityLogger } from '../../services/ActivityLogger';
 
 // Mock fetch
 const mockFetch = jest.fn();
@@ -395,6 +397,209 @@ describe('GitHubApiService Error Handling', () => {
           })
         })
       );
+    });
+  });
+
+  describe('GitHub Issue Comments', () => {
+    beforeEach(() => {
+      // Mock Supabase session with GitHub token
+      jest.spyOn(supabase.auth, 'getSession').mockResolvedValue({
+        data: {
+          session: {
+            provider_token: 'github_token_123',
+            user: { id: '1', email: 'test@example.com' },
+            expires_at: Date.now() + 3600000
+          } as any
+        },
+        error: null
+      });
+
+      // Mock ActivityLogger
+      jest.spyOn(ActivityLogger.prototype, 'logGitHubSync').mockImplementation();
+      jest.spyOn(ActivityLogger.prototype, 'logGitHubApiCall').mockImplementation();
+      jest.spyOn(ActivityLogger.prototype, 'logActivity').mockImplementation();
+    });
+
+    describe('createIssueComment', () => {
+      it('should successfully create a comment', async () => {
+        const mockResponse = {
+          id: 123,
+          body: 'Test comment',
+          user: { login: 'testuser' },
+          created_at: '2024-01-01T00:00:00Z'
+        };
+
+        mockFetch.mockResolvedValue({
+          ok: true,
+          status: 201,
+          json: () => Promise.resolve(mockResponse),
+          headers: new Map([['X-RateLimit-Remaining', '5000']])
+        } as any);
+
+        await GitHubApiService.createIssueComment('user/repo', 1, 'Test comment');
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          'https://api.github.com/repos/user/repo/issues/1/comments',
+          expect.objectContaining({
+            method: 'POST',
+            headers: expect.objectContaining({
+              'Authorization': 'Bearer github_token_123',
+              'Content-Type': 'application/json'
+            }),
+            body: JSON.stringify({ body: 'Test comment' })
+          })
+        );
+      });
+
+      it('should handle invalid repository format', async () => {
+        await expect(
+          GitHubApiService.createIssueComment('invalid-repo', 1, 'Test comment')
+        ).rejects.toThrow('Repository ID must be in format "owner/repo"');
+      });
+
+      it('should handle API errors', async () => {
+        mockFetch.mockResolvedValue({
+          ok: false,
+          status: 404,
+          statusText: 'Not Found'
+        } as Response);
+
+        await expect(
+          GitHubApiService.createIssueComment('user/repo', 1, 'Test comment')
+        ).rejects.toThrow('Failed to create comment: 404 Not Found');
+      });
+
+      it('should handle authentication errors', async () => {
+        mockFetch.mockResolvedValue({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized'
+        } as Response);
+
+        await expect(
+          GitHubApiService.createIssueComment('user/repo', 1, 'Test comment')
+        ).rejects.toThrow('GitHub access token expired. Please sign in again.');
+      });
+
+      it('should handle rate limiting with retry', async () => {
+        // First call: rate limited
+        mockFetch
+          .mockResolvedValueOnce({
+            ok: false,
+            status: 403,
+            headers: new Map([
+              ['X-RateLimit-Reset', String(Math.floor(Date.now() / 1000) + 3600)]
+            ])
+          } as any)
+          // Second call: success
+          .mockResolvedValueOnce({
+            ok: true,
+            status: 201,
+            json: () => Promise.resolve({ id: 123 }),
+            headers: new Map([['X-RateLimit-Remaining', '4999']])
+          } as any);
+
+        await GitHubApiService.createIssueComment('user/repo', 1, 'Test comment');
+
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe('createKoreanIssueComment', () => {
+      it('should create a Korean start comment', async () => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          status: 201,
+          json: () => Promise.resolve({ id: 123 }),
+          headers: new Map([['X-RateLimit-Remaining', '5000']])
+        } as any);
+
+        await GitHubApiService.createKoreanIssueComment('user/repo', 1, 'start');
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          'https://api.github.com/repos/user/repo/issues/1/comments',
+          expect.objectContaining({
+            method: 'POST',
+            body: expect.stringContaining('🚀 **작업을 시작합니다**')
+          })
+        );
+      });
+
+      it('should create a Korean progress comment with variables', async () => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          status: 201,
+          json: () => Promise.resolve({ id: 123 }),
+          headers: new Map([['X-RateLimit-Remaining', '5000']])
+        } as any);
+
+        const variables = {
+          status: '기능 구현 중',
+          completed_tasks: '- API 설계 완료',
+          next_steps: '- 테스트 작성'
+        };
+
+        await GitHubApiService.createKoreanIssueComment(
+          'user/repo', 
+          1, 
+          'progress', 
+          variables
+        );
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          'https://api.github.com/repos/user/repo/issues/1/comments',
+          expect.objectContaining({
+            method: 'POST',
+            body: expect.stringContaining('⏳ **작업이 진행 중입니다**')
+          })
+        );
+
+        const callBody = mockFetch.mock.calls[0][1].body;
+        const parsedBody = JSON.parse(callBody);
+        expect(parsedBody.body).toContain('기능 구현 중');
+        expect(parsedBody.body).toContain('API 설계 완료');
+      });
+
+      it('should create a Korean complete comment', async () => {
+        mockFetch.mockResolvedValue({
+          ok: true,
+          status: 201,
+          json: () => Promise.resolve({ id: 123 }),
+          headers: new Map([['X-RateLimit-Remaining', '5000']])
+        } as any);
+
+        const variables = {
+          implementation_details: '- Korean comment system implemented',
+          test_results: 'All tests passing'
+        };
+
+        await GitHubApiService.createKoreanIssueComment(
+          'user/repo', 
+          1, 
+          'complete', 
+          variables
+        );
+
+        const callBody = mockFetch.mock.calls[0][1].body;
+        const parsedBody = JSON.parse(callBody);
+        expect(parsedBody.body).toContain('✅ **작업이 완료되었습니다**');
+        expect(parsedBody.body).toContain('Korean comment system implemented');
+        expect(parsedBody.body).toContain('코드 리뷰를 부탁드립니다');
+      });
+
+      it('should handle errors and log to ActivityLogger', async () => {
+        mockFetch.mockRejectedValue(new Error('Network error'));
+
+        await expect(
+          GitHubApiService.createKoreanIssueComment('user/repo', 1, 'start')
+        ).rejects.toThrow('Network error');
+
+        expect(ActivityLogger.prototype.logActivity).toHaveBeenCalledWith(
+          'GitHub Issue Comment',
+          expect.stringContaining('Failed to create start comment'),
+          'error'
+        );
+      });
     });
   });
 });
