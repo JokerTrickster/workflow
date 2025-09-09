@@ -59,6 +59,7 @@ export interface AuthContextType {
   error: string | null
   signInWithGitHub: () => Promise<AuthResponse>
   signOut: () => Promise<{ error?: AuthErrorType | { message: string } | null }>
+  signOutWithConfirmation: () => Promise<void>
   refreshSession: () => Promise<AuthResponse>
   isAuthenticated: boolean
 }
