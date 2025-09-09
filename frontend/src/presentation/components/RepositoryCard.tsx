@@ -1,5 +1,6 @@
 'use client';
 
+import { memo, useMemo, useCallback } from 'react';
 import { Repository } from '../../domain/entities/Repository';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -13,7 +14,26 @@ interface RepositoryCardProps {
   isLoading?: boolean;
 }
 
-export function RepositoryCard({ repository, onSelect, onConnect, isLoading }: RepositoryCardProps) {
+const RepositoryCard = memo(function RepositoryCard({ repository, onSelect, onConnect, isLoading }: RepositoryCardProps) {
+  // Memoize formatted date to prevent re-computation on every render
+  const formattedDate = useMemo(() => 
+    new Date(repository.updated_at).toLocaleDateString(), 
+    [repository.updated_at]
+  );
+
+  // Memoize connect handler to prevent re-renders
+  const handleConnect = useCallback(async () => {
+    await onConnect(repository.id);
+    // After connecting, open the workspace with updated repository
+    const updatedRepository = { ...repository, is_connected: true };
+    onSelect(updatedRepository);
+  }, [onConnect, onSelect, repository]);
+
+  // Memoize select handler
+  const handleSelect = useCallback(() => {
+    onSelect(repository);
+  }, [onSelect, repository]);
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -66,7 +86,7 @@ export function RepositoryCard({ repository, onSelect, onConnect, isLoading }: R
           </div>
           <div className="flex items-center gap-1">
             <Calendar className="h-4 w-4" />
-            {new Date(repository.updated_at).toLocaleDateString()}
+            {formattedDate}
           </div>
         </div>
 
@@ -75,7 +95,7 @@ export function RepositoryCard({ repository, onSelect, onConnect, isLoading }: R
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => onSelect(repository)}
+              onClick={handleSelect}
               disabled={isLoading}
             >
               Open Workspace
@@ -83,12 +103,7 @@ export function RepositoryCard({ repository, onSelect, onConnect, isLoading }: R
           ) : (
             <Button 
               size="sm" 
-              onClick={async () => {
-                await onConnect(repository.id);
-                // After connecting, open the workspace with updated repository
-                const updatedRepository = { ...repository, is_connected: true };
-                onSelect(updatedRepository);
-              }}
+              onClick={handleConnect}
               disabled={isLoading}
             >
               {isLoading ? 'Connecting...' : 'Connect Repository'}
@@ -98,4 +113,6 @@ export function RepositoryCard({ repository, onSelect, onConnect, isLoading }: R
       </CardContent>
     </Card>
   );
-}
+});
+
+export { RepositoryCard };
