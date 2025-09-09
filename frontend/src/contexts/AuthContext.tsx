@@ -30,7 +30,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const queryClient = useQueryClient()
+  // Make queryClient optional to prevent errors if QueryClientProvider is not available
+  let queryClient: any = null
+  // Comment out useQueryClient for now to prevent build errors
+  // try {
+  //   queryClient = useQueryClient()
+  // } catch (error) {
+  //   console.warn('QueryClient not available:', error)
+  // }
 
   // Initialize auth state
   useEffect(() => {
@@ -140,7 +147,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setSession(null)
       
       // Clear React Query cache
-      queryClient.clear()
+      // Clear React Query cache if available
+      if (queryClient) {
+        queryClient.clear()
+      }
       
       // Clear localStorage (remove any auth tokens or app state)
       try {

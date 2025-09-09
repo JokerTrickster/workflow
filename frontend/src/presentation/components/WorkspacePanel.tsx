@@ -10,6 +10,7 @@ import { ExternalLink, Activity, BarChart3, AlertCircle, CheckCircle } from 'luc
 import { TaskTab } from './tabs/TaskTab';
 import { LogsTab } from './tabs/LogsTab';
 import { DashboardTab } from './tabs/DashboardTab';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 
 interface WorkspacePanelProps {
   repository: Repository;
@@ -138,15 +139,142 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
           </TabsList>
 
           <TabsContent value="tasks" className="space-y-4">
-            <TaskTab repository={repository} />
+            <ErrorBoundary 
+              level="component" 
+              showDetails={process.env.NODE_ENV === 'development'}
+              onError={(error, errorInfo) => {
+                console.error('TaskTab Error:', error, errorInfo);
+                // Log to activity logger if available
+              }}
+              fallback={(error, resetError) => (
+                <Card className="border-red-200 bg-red-50">
+                  <CardHeader>
+                    <CardTitle className="text-red-900 flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5" />
+                      Tasks Tab Error
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-red-700 mb-4">
+                      The tasks tab encountered an error and couldn't load properly.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={resetError}>
+                        Try Again
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => window.location.reload()}
+                      >
+                        Refresh Page
+                      </Button>
+                    </div>
+                    {process.env.NODE_ENV === 'development' && (
+                      <details className="mt-4 text-xs">
+                        <summary className="cursor-pointer font-medium">Technical Details</summary>
+                        <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
+                          {error.message}
+                        </pre>
+                      </details>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            >
+              <TaskTab repository={repository} />
+            </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="logs" className="space-y-4">
-            <LogsTab repository={repository} />
+            <ErrorBoundary 
+              level="component" 
+              showDetails={process.env.NODE_ENV === 'development'}
+              onError={(error, errorInfo) => {
+                console.error('LogsTab Error:', error, errorInfo);
+              }}
+              fallback={(error, resetError) => (
+                <Card className="border-red-200 bg-red-50">
+                  <CardHeader>
+                    <CardTitle className="text-red-900 flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5" />
+                      Logs Tab Error
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-red-700 mb-4">
+                      The activity logs tab encountered an error and couldn't load properly.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={resetError}>
+                        Try Again
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => window.location.reload()}
+                      >
+                        Refresh Page
+                      </Button>
+                    </div>
+                    {process.env.NODE_ENV === 'development' && (
+                      <details className="mt-4 text-xs">
+                        <summary className="cursor-pointer font-medium">Technical Details</summary>
+                        <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
+                          {error.message}
+                        </pre>
+                      </details>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            >
+              <LogsTab repository={repository} />
+            </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="dashboard" className="space-y-4">
-            <DashboardTab repository={repository} />
+            <ErrorBoundary 
+              level="component" 
+              showDetails={process.env.NODE_ENV === 'development'}
+              onError={(error, errorInfo) => {
+                console.error('DashboardTab Error:', error, errorInfo);
+              }}
+              fallback={(error, resetError) => (
+                <Card className="border-red-200 bg-red-50">
+                  <CardHeader>
+                    <CardTitle className="text-red-900 flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5" />
+                      Dashboard Tab Error
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-red-700 mb-4">
+                      The dashboard tab encountered an error and couldn't load properly.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={resetError}>
+                        Try Again
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => window.location.reload()}
+                      >
+                        Refresh Page
+                      </Button>
+                    </div>
+                    {process.env.NODE_ENV === 'development' && (
+                      <details className="mt-4 text-xs">
+                        <summary className="cursor-pointer font-medium">Technical Details</summary>
+                        <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
+                          {error.message}
+                        </pre>
+                      </details>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            >
+              <DashboardTab repository={repository} />
+            </ErrorBoundary>
           </TabsContent>
         </Tabs>
       </div>
