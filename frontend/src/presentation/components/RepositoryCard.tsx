@@ -35,68 +35,72 @@ const RepositoryCard = memo(function RepositoryCard({ repository, onSelect, onCo
   }, [onSelect, repository]);
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-lg">{repository.name}</CardTitle>
+    <Card className="w-full touch-target">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+          <div className="space-y-1 flex-1 min-w-0">
+            <CardTitle className="text-base sm:text-lg truncate">{repository.name}</CardTitle>
             <CardDescription className="flex items-center gap-1">
               <a 
                 href={repository.html_url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="hover:text-primary"
+                className="hover:text-primary truncate touch-target min-h-[28px] flex items-center"
+                aria-label={`Open ${repository.full_name} on GitHub`}
               >
                 {repository.full_name}
               </a>
-              <ExternalLink className="h-3 w-3" />
+              <ExternalLink className="h-3 w-3 shrink-0" />
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {repository.private && (
-              <Badge variant="secondary">Private</Badge>
+              <Badge variant="secondary" className="text-xs">Private</Badge>
             )}
             {repository.is_connected && (
-              <Badge variant="default">Connected</Badge>
+              <Badge variant="default" className="text-xs">Connected</Badge>
             )}
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 pt-0">
         {repository.description && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground line-clamp-2">
             {repository.description}
           </p>
         )}
         
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
           {repository.language && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <div className="w-2 h-2 rounded-full bg-blue-500" />
-              {repository.language}
+              <span className="truncate max-w-[60px]">{repository.language}</span>
             </div>
           )}
-          <div className="flex items-center gap-1">
-            <Star className="h-4 w-4" />
+          <div className="flex items-center gap-1 shrink-0">
+            <Star className="h-3 w-3 sm:h-4 sm:w-4" />
             {repository.stargazers_count}
           </div>
-          <div className="flex items-center gap-1">
-            <GitFork className="h-4 w-4" />
+          <div className="flex items-center gap-1 shrink-0">
+            <GitFork className="h-3 w-3 sm:h-4 sm:w-4" />
             {repository.forks_count}
           </div>
-          <div className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
-            {formattedDate}
+          <div className="flex items-center gap-1 shrink-0">
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">{formattedDate}</span>
+            <span className="sm:hidden">{new Date(repository.updated_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 pt-2">
           {repository.is_connected ? (
             <Button 
               variant="outline" 
               size="sm"
               onClick={handleSelect}
               disabled={isLoading}
+              className="touch-target text-sm"
+              aria-label={`Open workspace for ${repository.name}`}
             >
               Open Workspace
             </Button>
@@ -105,6 +109,8 @@ const RepositoryCard = memo(function RepositoryCard({ repository, onSelect, onCo
               size="sm" 
               onClick={handleConnect}
               disabled={isLoading}
+              className="touch-target text-sm"
+              aria-label={`Connect ${repository.name} repository`}
             >
               {isLoading ? 'Connecting...' : 'Connect Repository'}
             </Button>

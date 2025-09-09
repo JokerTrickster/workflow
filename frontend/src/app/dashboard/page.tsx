@@ -189,9 +189,9 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
           {/* Sidebar with filters */}
-          <div className="lg:w-80 shrink-0">
+          <div className="lg:w-80 shrink-0 order-2 lg:order-1">
             <ErrorBoundary 
               level="component"
               fallback={(error, resetError) => (
@@ -227,10 +227,10 @@ export default function Dashboard() {
           </div>
 
           {/* Main content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold">Your Repositories</h1>
+          <div className="flex-1 min-w-0 order-1 lg:order-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl font-bold">Your Repositories</h1>
                 <p className="text-sm text-muted-foreground">
                   {isLoading 
                     ? 'Loading repositories...' 
@@ -241,18 +241,18 @@ export default function Dashboard() {
                 </p>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {/* Network status indicator */}
                 <div className="flex items-center gap-1 text-xs">
                   {isOnline ? (
                     <>
                       <Wifi className="h-3 w-3 text-green-500" />
-                      <span className="text-green-600">Online</span>
+                      <span className="text-green-600 hidden sm:inline">Online</span>
                     </>
                   ) : (
                     <>
                       <WifiOff className="h-3 w-3 text-red-500" />
-                      <span className="text-red-600">Offline</span>
+                      <span className="text-red-600 hidden sm:inline">Offline</span>
                     </>
                   )}
                 </div>
@@ -262,9 +262,11 @@ export default function Dashboard() {
                   size="sm"
                   onClick={handleRetry}
                   disabled={isLoading || isRefetching}
+                  className="touch-target"
+                  aria-label="Refresh repositories"
                 >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${(isLoading || isRefetching) ? 'animate-spin' : ''}`} />
-                  Refresh
+                  <RefreshCw className={`h-4 w-4 sm:mr-2 ${(isLoading || isRefetching) ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Refresh</span>
                 </Button>
               </div>
             </div>

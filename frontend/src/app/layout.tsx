@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Noto_Sans_KR } from "next/font/google";
 import { QueryProvider } from "../providers/QueryProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { I18nProvider } from "@/contexts/I18nContext";
@@ -17,17 +17,30 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const notoSansKR = Noto_Sans_KR({
+  variable: "--font-noto-sans-kr",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "AI Git Workbench",
   description: "Manage your GitHub repositories with AI assistance",
   manifest: "/manifest.json",
-  themeColor: "#0969da",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "AI Git Workbench",
   },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#0969da",
 };
 
 export default function RootLayout({
@@ -46,7 +59,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="AI Git Workbench" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${notoSansKR.variable} font-sans antialiased`}
       >
         <ErrorBoundary level="critical" showDetails={process.env.NODE_ENV === 'development'}>
           <I18nProvider defaultLocale="ko" fallbackLocale="en">
