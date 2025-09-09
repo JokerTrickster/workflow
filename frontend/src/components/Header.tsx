@@ -3,6 +3,7 @@
 import { Github, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LogoutButton } from '@/components/LogoutButton'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface HeaderProps {
@@ -34,6 +35,9 @@ export function Header({
           <div className="flex items-center gap-4">
             {/* Custom action buttons */}
             {children}
+            
+            {/* Theme toggle */}
+            <ThemeToggle />
             
             {/* Refresh button */}
             {onRefresh && (
