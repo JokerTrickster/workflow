@@ -37,11 +37,17 @@ interface UseRepositoriesReturn {
 export function useRepositories(): UseRepositoriesReturn {
   const queryClient = useQueryClient();
   const [connectionStates, setConnectionStates] = useState<RepositoryConnectionState>({});
+  const [isClient, setIsClient] = useState(false);
   const activityLogger = ActivityLogger.getInstance();
+
+  // Ensure we're on the client side before accessing localStorage
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Load connection states from localStorage on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (isClient) {
       try {
         const stored = localStorage.getItem(CONNECTION_STORAGE_KEY);
         if (stored) {
@@ -51,19 +57,19 @@ export function useRepositories(): UseRepositoriesReturn {
         console.error('Failed to load repository connections from localStorage:', error);
       }
     }
-  }, []);
+  }, [isClient]);
 
   // Save connection states to localStorage whenever they change
   const saveConnectionStates = useCallback((states: RepositoryConnectionState) => {
     setConnectionStates(states);
-    if (typeof window !== 'undefined') {
+    if (isClient) {
       try {
         localStorage.setItem(CONNECTION_STORAGE_KEY, JSON.stringify(states));
       } catch (error) {
         console.error('Failed to save repository connections to localStorage:', error);
       }
     }
-  }, []);
+  }, [isClient]);
 
   // Fetch repositories from GitHub API
   const {
@@ -75,8 +81,15 @@ export function useRepositories(): UseRepositoriesReturn {
   } = useQuery({
     queryKey: [REPOSITORIES_QUERY_KEY],
     queryFn: async () => {
-      const response = await GitHubApiService.fetchUserRepositories();
-      return response.repositories;
+      console.log('🔍 Fetching repositories from GitHub API...');
+      try {
+        const response = await GitHubApiService.fetchUserRepositories();
+        console.log('✅ Repositories fetched successfully:', response.repositories.length, 'repos');
+        return response.repositories;
+      } catch (error) {
+        console.error('❌ Failed to fetch repositories:', error);
+        throw error;
+      }
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
@@ -88,6 +101,14 @@ export function useRepositories(): UseRepositoriesReturn {
     is_connected: connectionStates[repo.id]?.is_connected || false,
     local_path: connectionStates[repo.id]?.local_path,
   }));
+  
+  console.log('🔄 useRepositories hook state:', {
+    rawData: repositoriesData?.length || 0,
+    finalRepos: repositories.length,
+    isLoading,
+    isError,
+    error: error?.message
+  });
 
   // Connect repository mutation
   const connectMutation = useMutation({

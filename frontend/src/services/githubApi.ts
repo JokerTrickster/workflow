@@ -14,18 +14,30 @@ import {
 
 export class GitHubApiService {
   private static async getAccessToken(): Promise<string | null> {
+    console.log('🔑 Getting GitHub access token from Supabase session...');
     const { data: { session }, error } = await supabase.auth.getSession();
     
     if (error) {
-      console.error('Error getting session:', error);
+      console.error('❌ Error getting session:', error);
+      return null;
+    }
+
+    if (!session) {
+      console.error('❌ No session found - user not authenticated');
       return null;
     }
 
     if (!session?.provider_token) {
-      console.error('No GitHub access token found in session');
+      console.error('❌ No GitHub access token found in session');
+      console.log('Session data:', { 
+        user: session.user?.email, 
+        expires_at: session.expires_at,
+        provider_token: !!session.provider_token 
+      });
       return null;
     }
 
+    console.log('✅ GitHub access token found');
     return session.provider_token ?? null;
   }
 

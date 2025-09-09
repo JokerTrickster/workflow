@@ -55,6 +55,11 @@ export class ActivityLogger {
    * Load logs from localStorage
    */
   private loadLogs(): void {
+    if (typeof window === 'undefined') {
+      this.logs = [];
+      return;
+    }
+    
     try {
       const storedLogs = localStorage.getItem(ActivityLogger.STORAGE_KEY);
       if (storedLogs) {
@@ -72,6 +77,10 @@ export class ActivityLogger {
    * Save logs to localStorage
    */
   private saveLogs(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     try {
       localStorage.setItem(ActivityLogger.STORAGE_KEY, JSON.stringify(this.logs));
     } catch (error) {

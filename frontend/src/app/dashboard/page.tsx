@@ -33,12 +33,22 @@ export default function Dashboard() {
 
   // Repository data with error handling
   const {
-    data: repositories,
+    repositories,
     isLoading,
     error,
     refetch: refetchRepositories,
-    isRefetching
+    isRefetching,
+    connectRepository
   } = useRepositories();
+  
+  // Debug logging
+  console.log('📊 Dashboard state:', {
+    repositories: repositories?.length || 0,
+    isLoading,
+    error: error?.message,
+    isRefetching,
+    firstRepo: repositories?.[0]?.name
+  });
 
   // Handle repository selection
   const handleRepositorySelect = (repository: Repository) => {
@@ -50,12 +60,15 @@ export default function Dashboard() {
     setSelectedRepository(null);
   };
 
-  // Handle repository connection toggle
-  const handleRepositoryConnect = (repositoryId: number) => {
-    // This would typically call a mutation to toggle connection status
-    console.log('Toggle connection for repository:', repositoryId);
-    // For now, we'll just refetch to simulate the change
-    refetchRepositories();
+  // Handle repository connection
+  const handleRepositoryConnect = async (repositoryId: number) => {
+    console.log('Connecting repository:', repositoryId);
+    try {
+      await connectRepository(repositoryId);
+      console.log('Repository connected successfully');
+    } catch (error) {
+      console.error('Failed to connect repository:', error);
+    }
   };
 
   // Filter repositories based on search and filters
@@ -72,6 +85,15 @@ export default function Dashboard() {
     
     return matchesSearch && matchesLanguage && matchesConnection;
   }) || [];
+  
+  console.log('🔍 Filter results:', {
+    totalRepos: repositories?.length || 0,
+    filteredCount: filteredRepositories.length,
+    searchQuery,
+    languageFilter,
+    connectionFilter,
+    firstFilteredRepo: filteredRepositories[0]?.name
+  });
 
   // Get unique languages for filter
   const availableLanguages = Array.from(

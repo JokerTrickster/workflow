@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,72 +20,53 @@ import {
 import { Search, Filter, ChevronDown, X } from 'lucide-react';
 import { Repository } from '../../domain/entities/Repository';
 
-interface SearchFilters {
-  query: string;
-  language: string;
-  visibility: 'all' | 'public' | 'private';
-  connected: 'all' | 'connected' | 'disconnected';
-}
-
 interface SearchFilterProps {
-  filters: SearchFilters;
-  onFiltersChange: (filters: SearchFilters) => void;
-  repositories: Repository[];
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  languageFilter: string;
+  onLanguageChange: (language: string) => void;
+  connectionFilter: 'all' | 'connected' | 'disconnected';
+  onConnectionFilterChange: (filter: 'all' | 'connected' | 'disconnected') => void;
+  availableLanguages: string[];
+  isLoading?: boolean;
 }
 
-export function SearchFilter({ filters, onFiltersChange, repositories }: SearchFilterProps) {
+export function SearchFilter({ 
+  searchQuery, 
+  onSearchChange, 
+  languageFilter, 
+  onLanguageChange, 
+  connectionFilter, 
+  onConnectionFilterChange, 
+  availableLanguages, 
+  isLoading = false 
+}: SearchFilterProps) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // Extract unique languages from repositories
-  const availableLanguages = useMemo(() => {
-    const languages = repositories
-      .map(repo => repo.language)
-      .filter((lang): lang is string => lang !== null)
-      .filter((lang, index, array) => array.indexOf(lang) === index)
-      .sort();
-    return languages;
-  }, [repositories]);
-
-  const handleQueryChange = (value: string) => {
-    onFiltersChange({ ...filters, query: value });
-  };
-
   const handleLanguageChange = (value: string) => {
-    onFiltersChange({ 
-      ...filters, 
-      language: value === 'all' ? '' : value 
-    });
-  };
-
-  const handleVisibilityChange = (value: 'all' | 'public' | 'private') => {
-    onFiltersChange({ ...filters, visibility: value });
+    onLanguageChange(value === 'all' ? '' : value);
   };
 
   const handleConnectedChange = (value: 'all' | 'connected' | 'disconnected') => {
-    onFiltersChange({ ...filters, connected: value });
+    onConnectionFilterChange(value);
   };
 
   const clearAllFilters = () => {
-    onFiltersChange({
-      query: '',
-      language: '',
-      visibility: 'all',
-      connected: 'all',
-    });
+    onSearchChange('');
+    onLanguageChange('');
+    onConnectionFilterChange('all');
     setIsFilterOpen(false);
   };
 
   const hasActiveFilters = 
-    filters.query !== '' || 
-    filters.language !== '' || 
-    filters.visibility !== 'all' || 
-    filters.connected !== 'all';
+    searchQuery !== '' || 
+    languageFilter !== '' || 
+    connectionFilter !== 'all';
 
   const activeFilterCount = [
-    filters.query !== '',
-    filters.language !== '',
-    filters.visibility !== 'all',
-    filters.connected !== 'all',
+    searchQuery !== '',
+    languageFilter !== '',
+    connectionFilter !== 'all',
   ].filter(Boolean).length;
 
   return (
@@ -95,8 +76,8 @@ export function SearchFilter({ filters, onFiltersChange, repositories }: SearchF
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
         <Input
           placeholder="Search repositories by name, description, or owner..."
-          value={filters.query}
-          onChange={(e) => handleQueryChange(e.target.value)}
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
           className="pl-10 pr-4"
         />
       </div>
@@ -125,7 +106,7 @@ export function SearchFilter({ filters, onFiltersChange, repositories }: SearchF
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Language</label>
                     <Select
-                      value={filters.language || 'all'}
+                      value={languageFilter || 'all'}
                       onValueChange={handleLanguageChange}
                     >
                       <SelectTrigger>
@@ -142,29 +123,12 @@ export function SearchFilter({ filters, onFiltersChange, repositories }: SearchF
                     </Select>
                   </div>
 
-                  {/* Visibility Filter */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Visibility</label>
-                    <Select
-                      value={filters.visibility}
-                      onValueChange={handleVisibilityChange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All repositories</SelectItem>
-                        <SelectItem value="public">Public only</SelectItem>
-                        <SelectItem value="private">Private only</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   {/* Connection Status Filter */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Status</label>
                     <Select
-                      value={filters.connected}
+                      value={connectionFilter}
                       onValueChange={handleConnectedChange}
                     >
                       <SelectTrigger>
@@ -198,11 +162,11 @@ export function SearchFilter({ filters, onFiltersChange, repositories }: SearchF
         </Collapsible>
 
         {/* Active Filter Badges */}
-        {filters.query && (
+        {searchQuery && (
           <Badge variant="secondary" className="gap-1">
-            Search: {filters.query}
+            Search: {searchQuery}
             <button
-              onClick={() => handleQueryChange('')}
+              onClick={() => onSearchChange('')}
               className="hover:bg-muted-foreground/20 rounded-full p-1 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
               aria-label="Clear search"
             >
@@ -211,9 +175,9 @@ export function SearchFilter({ filters, onFiltersChange, repositories }: SearchF
           </Badge>
         )}
 
-        {filters.language && (
+        {languageFilter && (
           <Badge variant="secondary" className="gap-1">
-            {filters.language}
+            {languageFilter}
             <button
               onClick={() => handleLanguageChange('all')}
               className="hover:bg-muted-foreground/20 rounded-full p-1 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
@@ -224,22 +188,9 @@ export function SearchFilter({ filters, onFiltersChange, repositories }: SearchF
           </Badge>
         )}
 
-        {filters.visibility !== 'all' && (
+        {connectionFilter !== 'all' && (
           <Badge variant="secondary" className="gap-1 capitalize">
-            {filters.visibility}
-            <button
-              onClick={() => handleVisibilityChange('all')}
-              className="hover:bg-muted-foreground/20 rounded-full p-1 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
-              aria-label="Clear visibility filter"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </Badge>
-        )}
-
-        {filters.connected !== 'all' && (
-          <Badge variant="secondary" className="gap-1 capitalize">
-            {filters.connected}
+            {connectionFilter}
             <button
               onClick={() => handleConnectedChange('all')}
               className="hover:bg-muted-foreground/20 rounded-full p-1 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"

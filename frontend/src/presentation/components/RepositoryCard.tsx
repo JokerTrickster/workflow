@@ -4,16 +4,16 @@ import { Repository } from '../../domain/entities/Repository';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { Star, GitFork, Calendar, ExternalLink, Unplug } from 'lucide-react';
+import { Star, GitFork, Calendar, ExternalLink } from 'lucide-react';
 
 interface RepositoryCardProps {
   repository: Repository;
+  onSelect: (repository: Repository) => void;
   onConnect: (repoId: number) => void;
-  onDisconnect: (repoId: number) => void;
-  onOpenWorkspace: (repository: Repository) => void;
+  isLoading?: boolean;
 }
 
-export function RepositoryCard({ repository, onConnect, onDisconnect, onOpenWorkspace }: RepositoryCardProps) {
+export function RepositoryCard({ repository, onSelect, onConnect, isLoading }: RepositoryCardProps) {
   return (
     <Card className="w-full">
       <CardHeader>
@@ -72,30 +72,26 @@ export function RepositoryCard({ repository, onConnect, onDisconnect, onOpenWork
 
         <div className="flex justify-end gap-2">
           {repository.is_connected ? (
-            <>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => onOpenWorkspace(repository)}
-              >
-                Open Workspace
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => onDisconnect(repository.id)}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <Unplug className="h-4 w-4 mr-1" />
-                Disconnect
-              </Button>
-            </>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => onSelect(repository)}
+              disabled={isLoading}
+            >
+              Open Workspace
+            </Button>
           ) : (
             <Button 
               size="sm" 
-              onClick={() => onConnect(repository.id)}
+              onClick={async () => {
+                await onConnect(repository.id);
+                // After connecting, open the workspace with updated repository
+                const updatedRepository = { ...repository, is_connected: true };
+                onSelect(updatedRepository);
+              }}
+              disabled={isLoading}
             >
-              Connect Repository
+              {isLoading ? 'Connecting...' : 'Connect Repository'}
             </Button>
           )}
         </div>
