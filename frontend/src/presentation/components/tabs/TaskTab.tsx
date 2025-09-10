@@ -984,51 +984,59 @@ export function TaskTab({ repository }: TaskTabProps) {
   };
 
   return (
-    <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-3 mb-6">
-        <TabsTrigger value="tasks" className="flex items-center gap-2">
-          <CheckCircle className="h-4 w-4" />
-          <span className="hidden sm:inline">Tasks</span>
-        </TabsTrigger>
-        <TabsTrigger value="issues" className="flex items-center gap-2">
-          <AlertCircle className="h-4 w-4" />
-          <span className="hidden sm:inline">Issues</span>
-        </TabsTrigger>
-        <TabsTrigger value="prs" className="flex items-center gap-2">
-          <GitPullRequest className="h-4 w-4" />
-          <span className="hidden sm:inline">PRs</span>
-        </TabsTrigger>
-      </TabsList>
+    <div className="h-full flex flex-col">
+      <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="w-full flex flex-col h-full">
+        <TabsList className="grid w-full grid-cols-3 mb-6 shrink-0">
+          <TabsTrigger value="tasks" className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4" />
+            <span className="hidden sm:inline">Tasks</span>
+          </TabsTrigger>
+          <TabsTrigger value="issues" className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span className="hidden sm:inline">Issues</span>
+          </TabsTrigger>
+          <TabsTrigger value="prs" className="flex items-center gap-2">
+            <GitPullRequest className="h-4 w-4" />
+            <span className="hidden sm:inline">PRs</span>
+          </TabsTrigger>
+        </TabsList>
 
-      <TabsContent value="tasks" className="space-y-4">
-        {renderTasks()}
-      </TabsContent>
+        <TabsContent value="tasks" className="flex-1 overflow-auto">
+          <div className="space-y-4">
+            {renderTasks()}
+          </div>
+        </TabsContent>
 
-      <TabsContent value="issues" className="space-y-4">
-        {renderGitHubContent(
-          'issues',
-          filteredIssues,
-          issuesLoading,
-          issuesError,
-          issuesErrorData as Error,
-          refetchIssues,
-          issuesFilter,
-          setIssuesFilter
-        )}
-      </TabsContent>
+        <TabsContent value="issues" className="flex-1 overflow-auto">
+          <div className="space-y-4">
+            {renderGitHubContent(
+              'issues',
+              filteredIssues,
+              issuesLoading,
+              issuesError,
+              issuesErrorData as Error,
+              refetchIssues,
+              issuesFilter,
+              setIssuesFilter
+            )}
+          </div>
+        </TabsContent>
 
-      <TabsContent value="prs" className="space-y-4">
-        {renderGitHubContent(
-          'prs',
-          filteredPRs,
-          prsLoading,
-          prsError,
-          prsErrorData as Error,
-          refetchPRs,
-          prsFilter,
-          setPrsFilter
-        )}
-      </TabsContent>
-    </Tabs>
+        <TabsContent value="prs" className="flex-1 overflow-auto">
+          <div className="space-y-4">
+            {renderGitHubContent(
+              'prs',
+              filteredPRs,
+              prsLoading,
+              prsError,
+              prsErrorData as Error,
+              refetchPRs,
+              prsFilter,
+              setPrsFilter
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

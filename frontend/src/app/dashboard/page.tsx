@@ -171,7 +171,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header 
+        title="AI Git Workbench"
+        onRefresh={handleRetry}
+        isLoading={isLoading || isRefetching}
+      />
       
       <main className="container mx-auto max-w-7xl px-4 py-8 px-safe-4">
         {/* Network Status Banner */}
@@ -423,7 +427,6 @@ export default function Dashboard() {
                   onSelect={handleRepositorySelect}
                   onConnect={handleRepositoryConnect}
                   isLoading={isRefetching}
-                  height={Math.min(600, filteredRepositories.length * 280)}
                 />
               </ErrorBoundary>
             )}

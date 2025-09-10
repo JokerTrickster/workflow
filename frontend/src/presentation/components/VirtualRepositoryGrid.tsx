@@ -57,7 +57,7 @@ const VirtualRepositoryGrid = memo(function VirtualRepositoryGrid({
   // For mobile optimization, use a simple grid instead of virtualization
   // This provides better scrolling performance on mobile devices
   return (
-    <div className="w-full" style={{ maxHeight: height, overflow: 'auto' }}>
+    <div className="w-full">
       <SimpleRepositoryGrid
         repositories={repositories}
         onSelect={onSelect}

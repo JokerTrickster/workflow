@@ -344,7 +344,9 @@ export function DashboardTab({ repository }: DashboardTabProps) {
   const isLoading = issuesLoading || prsLoading || tasksLoading || eventsLoading;
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col">
+      <div className="flex-1 overflow-auto">
+        <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -794,6 +796,8 @@ export function DashboardTab({ repository }: DashboardTabProps) {
           )}
         </CardContent>
       </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -56,16 +56,18 @@ export function ThemeToggle() {
 
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="sm"
       onClick={cycleTheme}
-      className="h-9 w-9 px-0 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+      className="gap-2 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800"
       aria-label={getLabel()}
     >
-      <div className="transition-transform duration-200 hover:scale-110">
+      <div className="transition-transform duration-200">
         {getIcon()}
       </div>
-      <span className="sr-only">{getLabel()}</span>
+      <span className="hidden sm:inline text-xs">
+        {theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'Auto'}
+      </span>
     </Button>
   );
 }

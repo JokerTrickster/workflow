@@ -198,7 +198,7 @@ export function LogsTab({ repository }: LogsTabProps) {
   };
   
   return (
-    <div className="space-y-4">
+    <div className="h-full flex flex-col space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -291,8 +291,9 @@ export function LogsTab({ repository }: LogsTabProps) {
       </Card>
       
       {/* Activity Feed */}
-      <div className="space-y-3">
-        {filteredLogs.length === 0 ? (
+      <div className="flex-1 overflow-auto">
+        <div className="space-y-3">
+          {filteredLogs.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Activity className="h-12 w-12 mb-4 opacity-50" />
@@ -417,6 +418,7 @@ export function LogsTab({ repository }: LogsTabProps) {
             ))}
           </>
         )}
+        </div>
       </div>
     </div>
   );

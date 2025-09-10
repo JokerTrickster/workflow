@@ -37,9 +37,9 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
   // Show connection message for non-connected repositories
   if (!repository.is_connected) {
     return (
-      <div className="fixed inset-0 bg-background z-50 flex flex-col safe-area-inset">
+      <div className="min-h-screen bg-background">
         {/* Header */}
-        <div className="border-b bg-card">
+        <div className="sticky top-0 z-10 border-b bg-card/80 backdrop-blur-sm">
           <div className="container mx-auto max-w-7xl px-4 py-4 px-safe-4">
             <div className="flex items-center justify-between">
               <div>
@@ -59,8 +59,8 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 container mx-auto max-w-7xl px-4 py-6 px-safe-4">
-          <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
+        <div className="container mx-auto max-w-7xl px-4 py-6 px-safe-4">
+          <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
             <AlertCircle className="h-16 w-16 text-muted-foreground" />
             <div className="space-y-2">
               <h2 className="text-2xl font-bold">Repository Not Connected</h2>
@@ -88,9 +88,9 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
 
   // For connected repositories, show the 3-tab interface
   return (
-    <div className="fixed inset-0 bg-background z-50 flex flex-col safe-area-inset">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <div className="border-b bg-card">
+      <div className="sticky top-0 z-10 border-b bg-card/80 backdrop-blur-sm shrink-0">
         <div className="container mx-auto max-w-7xl px-4 py-4 px-safe-4">
           <div className="flex items-center justify-between">
             <div>
@@ -99,7 +99,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
                 <Badge variant={repository.private ? "secondary" : "outline"}>
                   {repository.private ? 'Private' : 'Public'}
                 </Badge>
-                <Badge variant="default" className="bg-green-100 text-green-800">
+                <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
                   Connected
                 </Badge>
               </div>
@@ -121,9 +121,9 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 container mx-auto max-w-7xl px-4 py-6 px-safe-4">
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+      <div className="container mx-auto max-w-7xl px-4 py-6 px-safe-4 flex flex-col flex-1 min-h-0">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full flex flex-col h-full">
+          <TabsList className="grid w-full grid-cols-3 mb-6 shrink-0">
             <TabsTrigger value="tasks" className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Tasks</span>
@@ -138,7 +138,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="tasks" className="space-y-4">
+          <TabsContent value="tasks" className="flex-1 min-h-0 overflow-auto">
             <ErrorBoundary 
               level="component" 
               showDetails={process.env.NODE_ENV === 'development'}
@@ -181,11 +181,13 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
                 </Card>
               )}
             >
-              <TaskTab repository={repository} />
+              <div className="h-full">
+                <TaskTab repository={repository} />
+              </div>
             </ErrorBoundary>
           </TabsContent>
 
-          <TabsContent value="logs" className="space-y-4">
+          <TabsContent value="logs" className="flex-1 min-h-0 overflow-auto">
             <ErrorBoundary 
               level="component" 
               showDetails={process.env.NODE_ENV === 'development'}
@@ -227,11 +229,13 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
                 </Card>
               )}
             >
-              <LogsTab repository={repository} />
+              <div className="h-full">
+                <LogsTab repository={repository} />
+              </div>
             </ErrorBoundary>
           </TabsContent>
 
-          <TabsContent value="dashboard" className="space-y-4">
+          <TabsContent value="dashboard" className="flex-1 min-h-0 overflow-auto">
             <ErrorBoundary 
               level="component" 
               showDetails={process.env.NODE_ENV === 'development'}
@@ -273,7 +277,9 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
                 </Card>
               )}
             >
-              <DashboardTab repository={repository} />
+              <div className="h-full">
+                <DashboardTab repository={repository} />
+              </div>
             </ErrorBoundary>
           </TabsContent>
         </Tabs>
