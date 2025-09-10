@@ -82,11 +82,11 @@ fi
 # Cleanup
 rm -f "$TEMP_SCRIPT"
 
-# Step 5: Find local task file (following original PM logic)
-echo "📂 Looking for local task file..."
+# Step 5: Create or find local task file
+echo "📂 Creating/finding local task file..."
 
+# First try to find existing task file
 TASK_FILE=""
-# First check new naming pattern
 for epic_dir in .claude/epics/*/; do
     if [ -f "${epic_dir}${ISSUE_NUMBER}.md" ]; then
         TASK_FILE="${epic_dir}${ISSUE_NUMBER}.md"
@@ -100,13 +100,27 @@ if [ -z "$TASK_FILE" ]; then
 fi
 
 if [ -z "$TASK_FILE" ]; then
-    echo "⚠️  No local task file found for issue #$ISSUE_NUMBER"
-    echo "   This issue may have been created outside the PM system"
-    echo "   You can still work on it, but PM tracking will be limited"
-    EPIC_NAME="dashboard-ux-improvements"  # Default epic
+    echo "📝 No existing task file found - creating new one..."
+    
+    # Determine epic name from issue labels or use default
+    EPIC_NAME="github-issue-${ISSUE_NUMBER}"
+    ISSUE_BODY=$(echo "$ISSUE_DATA" | jq -r '.body // ""')
+    DESCRIPTION="GitHub Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}\n\n${ISSUE_BODY}"
+    
+    # Create task file using our script
+    echo "🔧 Creating task file..."
+    TASK_ID=$(.claude/scripts/create-task-file.sh "$ISSUE_TITLE" "$EPIC_NAME" "" "$ISSUE_NUMBER" "$DESCRIPTION")
+    
+    TASK_FILE=".claude/epics/tasks/${TASK_ID}.md"
+    echo "✅ Created new task file: $TASK_FILE"
 else
-    echo "✅ Found task file: $TASK_FILE"
-    EPIC_NAME=$(basename "$(dirname "$TASK_FILE")")
+    echo "✅ Found existing task file: $TASK_FILE"
+    # Extract epic name from existing file
+    if [[ "$TASK_FILE" =~ \.claude/epics/([^/]+)/ ]]; then
+        EPIC_NAME="${BASH_REMATCH[1]}"
+    else
+        EPIC_NAME="general-tasks"
+    fi
 fi
 
 # Step 6: Check for worktree

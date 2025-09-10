@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Repository } from '../../../domain/entities/Repository';
 import { Task } from '../../../domain/entities/Task';
 import { TaskCreationForm } from '../../../components/TaskCreationForm';
 import { ActivityLogger } from '../../../services/ActivityLogger';
+import { TaskFileManager } from '../../../services/TaskFileManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -55,55 +56,34 @@ interface TaskTabProps {
   repository: Repository;
 }
 
-// Mock tasks data (keeping the existing task functionality)
-const mockTasks: Task[] = [
-  {
-    id: '1',
-    title: 'Add dark mode support',
-    description: 'Implement dark mode toggle in settings page with theme persistence',
-    status: 'completed',
-    repository_id: 1,
-    created_at: '2024-09-05T10:00:00Z',
-    updated_at: '2024-09-05T15:30:00Z',
-    completed_at: '2024-09-05T15:30:00Z',
-    branch_name: 'feature/dark-mode',
-    pr_url: 'https://github.com/captain/ai-git-workbench/pull/1',
-    build_status: 'success',
-    lint_status: 'success',
-    ai_tokens_used: 1250,
-  },
-  {
-    id: '2',
-    title: 'Fix authentication bug',
-    description: 'Resolve token refresh issue causing unexpected logouts',
-    status: 'in_progress',
-    repository_id: 1,
-    created_at: '2024-09-06T08:00:00Z',
-    updated_at: '2024-09-06T10:15:00Z',
-    started_at: '2024-09-06T09:00:00Z',
-    branch_name: 'fix/auth-token-refresh',
-    build_status: 'pending',
-    ai_tokens_used: 800,
-  },
-  {
-    id: '3',
-    title: 'Add unit tests',
-    description: 'Write comprehensive unit tests for core authentication and repository management functions',
-    status: 'pending',
-    repository_id: 1,
-    created_at: '2024-09-06T09:00:00Z',
-    updated_at: '2024-09-06T09:00:00Z',
-  },
-];
 
 export function TaskTab({ repository }: TaskTabProps) {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [selectedGitHubIssue, setSelectedGitHubIssue] = useState<GitHubIssue | undefined>();
   const [selectedGitHubPR, setSelectedGitHubPR] = useState<GitHubPullRequest | undefined>();
   
   const activityLogger = ActivityLogger.getInstance();
+  const taskFileManager = TaskFileManager.getInstance();
+
+  // Load tasks from epic files on component mount
+  useEffect(() => {
+    loadTasks();
+  }, []);
+
+  const loadTasks = async () => {
+    setIsLoadingTasks(true);
+    try {
+      const loadedTasks = await taskFileManager.loadTasksFromEpics();
+      setTasks(loadedTasks);
+    } catch (error) {
+      console.error('Failed to load tasks:', error);
+    } finally {
+      setIsLoadingTasks(false);
+    }
+  };
   
   // GitHub Issues and PRs state
   const [issuesFilter, setIssuesFilter] = useState<'all' | 'open' | 'closed'>('open');
@@ -148,15 +128,55 @@ export function TaskTab({ repository }: TaskTabProps) {
   const handleCreateTask = async (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
     setIsCreatingTask(true);
     try {
-      // For now, simulate the domain layer until we have a proper repository implementation
-      const newTask: Task = {
-        id: Date.now().toString(),
-        ...taskData,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      // Determine epic name from GitHub issue/PR or use default
+      let epicName = 'general-tasks';
+      if (selectedGitHubIssue) {
+        epicName = `github-issue-${selectedGitHubIssue.number}`;
+      } else if (selectedGitHubPR) {
+        epicName = `github-pr-${selectedGitHubPR.number}`;
+      }
 
-      setTasks(prev => [newTask, ...prev]);
+      // Create task content
+      const taskContent = `# ${taskData.title}
+
+## Description
+${taskData.description}
+
+## Repository
+${repository.name} (${repository.full_name})
+
+${selectedGitHubIssue ? `## GitHub Issue
+- Issue #${selectedGitHubIssue.number}: ${selectedGitHubIssue.title}
+- URL: ${selectedGitHubIssue.html_url}
+` : ''}${selectedGitHubPR ? `## GitHub Pull Request
+- PR #${selectedGitHubPR.number}: ${selectedGitHubPR.title}
+- URL: ${selectedGitHubPR.html_url}
+` : ''}
+## Progress
+- [ ] Task created
+- [ ] Analysis completed
+- [ ] Implementation started
+- [ ] Testing completed
+- [ ] Task completed
+
+## Notes
+Task created on ${new Date().toISOString()}`;
+
+      // Create task file
+      const taskFile = await taskFileManager.createTaskFile({
+        title: taskData.title,
+        status: taskData.status,
+        epic: epicName,
+        branch: taskData.branch_name,
+        tokensUsed: 0,
+        githubIssue: selectedGitHubIssue?.number,
+        prUrl: taskData.pr_url,
+        buildStatus: taskData.build_status,
+        lintStatus: taskData.lint_status,
+      }, taskContent);
+
+      // Reload tasks to show the new one
+      await loadTasks();
       
       // Log task creation
       const metadata: { githubUrl?: string; issueNumber?: number; prNumber?: number; branchName?: string } = {};
@@ -168,13 +188,13 @@ export function TaskTab({ repository }: TaskTabProps) {
         metadata.githubUrl = selectedGitHubPR.html_url;
         metadata.prNumber = selectedGitHubPR.number;
       }
-      if (newTask.branch_name) {
-        metadata.branchName = newTask.branch_name;
+      if (taskData.branch_name) {
+        metadata.branchName = taskData.branch_name;
       }
       
       activityLogger.logTaskCreated(
-        newTask.id,
-        newTask.title,
+        taskFile.metadata.id,
+        taskFile.metadata.title,
         repository.id,
         repository.name,
         metadata
@@ -200,20 +220,26 @@ export function TaskTab({ repository }: TaskTabProps) {
     }
   };
 
-  const handleExecuteTask = (taskId: string) => {
+  const handleExecuteTask = async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     
-    setTasks(prev =>
-      prev.map(t =>
-        t.id === taskId 
-          ? { ...t, status: 'in_progress', started_at: new Date().toISOString() }
-          : t
-      )
-    );
-    
-    // Log task execution started
-    activityLogger.logTaskStarted(taskId, task.title);
+    try {
+      // Update task file with in_progress status
+      await taskFileManager.updateTaskFile(taskId, {
+        status: 'in_progress',
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      
+      // Reload tasks to reflect changes
+      await loadTasks();
+      
+      // Log task execution started
+      activityLogger.logTaskStarted(taskId, task.title);
+    } catch (error) {
+      console.error('Failed to start task:', error);
+    }
   };
 
   const handleCreateTaskFromIssue = (issue: GitHubIssue) => {
@@ -456,8 +482,28 @@ export function TaskTab({ repository }: TaskTabProps) {
         </Dialog>
       </div>
 
-      <div className="space-y-4">
-        {tasks.map((task) => (
+      {isLoadingTasks ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2 mt-2"></div>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+      ) : tasks.length === 0 ? (
+        <div className="text-center py-8">
+          <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <h3 className="text-lg font-semibold mb-2">No Tasks Found</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Create your first task to get started with AI-powered development
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {tasks.map((task) => (
           <Card key={task.id}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-4">
@@ -515,8 +561,9 @@ export function TaskTab({ repository }: TaskTabProps) {
               </CardContent>
             )}
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
