@@ -59,10 +59,42 @@ export function TaskCreationForm({
     return '';
   });
 
+  // Validation errors state
+  const [errors, setErrors] = useState<{
+    title?: string;
+    description?: string;
+    branchName?: string;
+  }>({});
+
+  // Clear specific error when user starts typing
+  const clearError = (field: keyof typeof errors) => {
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title.trim()) return;
+    // Validate mandatory fields
+    const newErrors: typeof errors = {};
+    
+    if (!title.trim()) {
+      newErrors.title = 'Task title is required';
+    }
+    
+    if (!description.trim()) {
+      newErrors.description = 'Task description is required';
+    }
+    
+    if (!branchName.trim()) {
+      newErrors.branchName = 'Branch name is required';
+    }
+    
+    setErrors(newErrors);
+    
+    // Stop if there are validation errors
+    if (Object.keys(newErrors).length > 0) return;
 
     const taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'> = {
       title: title.trim(),
@@ -176,43 +208,66 @@ export function TaskCreationForm({
 
       <div className="space-y-2">
         <label htmlFor="title" className="text-sm font-medium">
-          Task Title
+          Task Title <span className="text-red-500">*</span>
         </label>
         <Input
           id="title"
           placeholder="Enter task title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            clearError('title');
+          }}
           required
           disabled={isSubmitting}
+          className={errors.title ? 'border-red-500 focus:border-red-500' : ''}
         />
+        {errors.title && (
+          <p className="text-sm text-red-600 mt-1">{errors.title}</p>
+        )}
       </div>
 
       <div className="space-y-2">
         <label htmlFor="description" className="text-sm font-medium">
-          Description
+          Description <span className="text-red-500">*</span>
         </label>
         <Textarea
           id="description"
-          placeholder="Enter task description (optional)"
+          placeholder="Enter task description"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(e) => {
+            setDescription(e.target.value);
+            clearError('description');
+          }}
           rows={4}
           disabled={isSubmitting}
+          required
+          className={errors.description ? 'border-red-500 focus:border-red-500' : ''}
         />
+        {errors.description && (
+          <p className="text-sm text-red-600 mt-1">{errors.description}</p>
+        )}
       </div>
 
       <div className="space-y-2">
         <label htmlFor="branchName" className="text-sm font-medium">
-          Branch Name <span className="text-muted-foreground">(optional)</span>
+          Branch Name <span className="text-red-500">*</span>
         </label>
         <Input
           id="branchName"
           placeholder="feature/branch-name"
           value={branchName}
-          onChange={(e) => setBranchName(e.target.value)}
+          onChange={(e) => {
+            setBranchName(e.target.value);
+            clearError('branchName');
+          }}
           disabled={isSubmitting || Boolean(githubPullRequest)}
+          required
+          className={errors.branchName ? 'border-red-500 focus:border-red-500' : ''}
         />
+        {errors.branchName && (
+          <p className="text-sm text-red-600 mt-1">{errors.branchName}</p>
+        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
@@ -226,7 +281,7 @@ export function TaskCreationForm({
         </Button>
         <Button 
           type="submit" 
-          disabled={!title.trim() || isSubmitting}
+          disabled={!title.trim() || !description.trim() || !branchName.trim() || isSubmitting}
         >
           {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           Create Task

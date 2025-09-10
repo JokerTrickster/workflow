@@ -421,7 +421,6 @@ export default function Dashboard() {
                   onSelect={handleRepositorySelect}
                   onConnect={handleRepositoryConnect}
                   isLoading={isRefetching}
-                  height={Math.min(600, filteredRepositories.length * 280)}
                 />
               </ErrorBoundary>
             )}

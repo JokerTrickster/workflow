@@ -1,4 +1,5 @@
 import { Task } from '../domain/entities/Task';
+import { WorkLogManager } from './WorkLogManager';
 
 export interface TaskFileMetadata {
   id: string;
@@ -28,6 +29,7 @@ export class TaskFileManager {
   private taskCache: Map<string, TaskFile> = new Map();
   private lastCacheUpdate = 0;
   private readonly CACHE_TTL = 1000; // 1 second (reduced for testing)
+  private workLogManager = WorkLogManager.getInstance();
 
   private constructor() {}
 
@@ -115,6 +117,18 @@ export class TaskFileManager {
       // Update cache
       this.taskCache.set(createdTaskFile.metadata.id, createdTaskFile);
       
+      // Log task creation to work logs
+      await this.workLogManager.logTaskCreated(
+        createdTaskFile.metadata.id,
+        createdTaskFile.metadata.title,
+        repositoryName || 'workflow',
+        {
+          branch: createdTaskFile.metadata.branch,
+          githubIssue: createdTaskFile.metadata.githubIssue,
+          description: content.substring(0, 200), // First 200 chars of description
+        }
+      );
+      
       return createdTaskFile;
     } catch (error) {
       console.error('Failed to create task file:', error);
@@ -157,6 +171,35 @@ export class TaskFileManager {
       
       // Update cache
       this.taskCache.set(taskId, result);
+      
+      // Log status changes to work logs
+      if (updates.status && existingTask.metadata.status !== updates.status) {
+        const statusChangeMessages = {
+          pending: 'Task set to pending status',
+          in_progress: 'Task started - execution in progress',
+          completed: 'Task completed successfully',
+          failed: 'Task failed during execution'
+        };
+        
+        await this.workLogManager.logTaskStatusChange(
+          taskId,
+          result.metadata.title,
+          repositoryName || 'workflow',
+          updates.status,
+          statusChangeMessages[updates.status]
+        );
+      }
+      
+      // Log other significant updates
+      if (updates.prUrl && !existingTask.metadata.prUrl) {
+        await this.workLogManager.logProgress(
+          taskId,
+          result.metadata.title,
+          repositoryName || 'workflow',
+          'Pull request URL added to task',
+          { prUrl: updates.prUrl }
+        );
+      }
       
       return result;
     } catch (error) {

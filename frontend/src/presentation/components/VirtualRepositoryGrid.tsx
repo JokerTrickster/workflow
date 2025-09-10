@@ -44,7 +44,7 @@ const VirtualRepositoryGrid = memo(function VirtualRepositoryGrid({
   onSelect,
   onConnect,
   isLoading = false,
-  height = 600
+  height
 }: VirtualRepositoryGridProps) {
   if (repositories.length === 0) {
     return (
@@ -56,8 +56,10 @@ const VirtualRepositoryGrid = memo(function VirtualRepositoryGrid({
 
   // For mobile optimization, use a simple grid instead of virtualization
   // This provides better scrolling performance on mobile devices
+  const containerStyle = height ? { maxHeight: height, overflow: 'auto' } : {};
+  
   return (
-    <div className="w-full" style={{ maxHeight: height, overflow: 'auto' }}>
+    <div className="w-full" style={containerStyle}>
       <SimpleRepositoryGrid
         repositories={repositories}
         onSelect={onSelect}
