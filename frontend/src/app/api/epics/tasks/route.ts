@@ -7,6 +7,7 @@ export interface TaskFileMetadata {
   id: string;
   title: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  repository: string;
   epic: string;
   branch?: string;
   createdAt: string;
@@ -25,21 +26,49 @@ export interface TaskFile {
   content: string;
 }
 
-const TASKS_DIR = path.resolve(process.cwd(), '../.claude/epics/tasks');
+const EPICS_BASE_DIR = path.resolve(process.cwd(), '../.claude/epics');
 
-// Ensure tasks directory exists
-async function ensureTasksDir() {
+// Get current repository name from git remote or default
+async function getCurrentRepository(): Promise<string> {
   try {
-    await fs.mkdir(TASKS_DIR, { recursive: true });
+    // Try to get from environment or default to workflow
+    return process.env.REPOSITORY_NAME || 'workflow';
+  } catch (error) {
+    console.warn('Failed to get repository name, using default:', error);
+    return 'workflow';
+  }
+}
+
+// Get tasks directory for specific repository
+function getTasksDir(repository: string): string {
+  return path.join(EPICS_BASE_DIR, 'repositories', repository, 'tasks');
+}
+
+// Ensure tasks directory exists for repository
+async function ensureTasksDir(repository: string) {
+  try {
+    const tasksDir = getTasksDir(repository);
+    await fs.mkdir(tasksDir, { recursive: true });
   } catch (error) {
     console.error('Failed to create tasks directory:', error);
   }
 }
 
-// Get all task files
+// Get all task files for current repository
 export async function GET() {
   try {
-    await ensureTasksDir();
+    const repository = await getCurrentRepository();
+    const TASKS_DIR = getTasksDir(repository);
+    
+    await ensureTasksDir(repository);
+    
+    // Check if directory exists
+    try {
+      await fs.access(TASKS_DIR);
+    } catch {
+      // Directory doesn't exist, return empty array
+      return NextResponse.json([]);
+    }
     
     const files = await fs.readdir(TASKS_DIR);
     const taskFiles = files.filter(file => file.endsWith('.md') && file !== 'task-template.md');
@@ -56,6 +85,11 @@ export async function GET() {
           metadata: frontMatter as TaskFileMetadata,
           content: markdownContent.trim(),
         };
+        
+        // Ensure repository field is set correctly
+        if (!taskFile.metadata.repository) {
+          taskFile.metadata.repository = repository;
+        }
         
         tasks.push(taskFile);
       } catch (error) {
@@ -76,12 +110,20 @@ export async function GET() {
 // Create new task file
 export async function POST(request: NextRequest) {
   try {
-    await ensureTasksDir();
+    const repository = await getCurrentRepository();
+    const TASKS_DIR = getTasksDir(repository);
+    
+    await ensureTasksDir(repository);
     
     const taskFile: TaskFile = await request.json();
     
     if (!taskFile.metadata.id || !taskFile.metadata.title) {
       return NextResponse.json({ error: 'Task ID and title are required' }, { status: 400 });
+    }
+    
+    // Ensure repository field is set correctly
+    if (!taskFile.metadata.repository) {
+      taskFile.metadata.repository = repository;
     }
     
     const filename = `${taskFile.metadata.id}.md`;

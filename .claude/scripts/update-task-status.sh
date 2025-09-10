@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # Script to update task status in task files
-# Usage: ./update-task-status.sh <task-id> <status> [tokens] [branch] [pr-url]
+# Usage: ./update-task-status.sh <task-id> <status> [tokens] [branch] [pr-url] [repository]
 
 set -e
 
 # Configuration
-TASKS_DIR=".claude/epics/tasks"
+REPOSITORY="${6:-workflow}"  # Default to workflow
+TASKS_DIR=".claude/epics/repositories/$REPOSITORY/tasks"
 
 # Arguments
 TASK_ID="$1"
@@ -18,8 +19,9 @@ PR_URL="$5"
 # Validation
 if [ -z "$TASK_ID" ] || [ -z "$STATUS" ]; then
     echo "Error: Task ID and status are required"
-    echo "Usage: $0 <task-id> <status> [tokens] [branch] [pr-url]"
+    echo "Usage: $0 <task-id> <status> [tokens] [branch] [pr-url] [repository]"
     echo "Status options: pending, in_progress, completed, failed"
+    echo "Repository defaults to 'workflow' if not provided"
     exit 1
 fi
 
@@ -132,6 +134,7 @@ echo "- Status changed to: **$STATUS**" >> "$TASK_FILE"
 echo "✅ Task status updated successfully!"
 echo "📁 File: $TASK_FILE"
 echo "🆔 Task ID: $TASK_ID"
+echo "📦 Repository: $REPOSITORY"
 echo "📊 Status: $STATUS"
 [ "$TOKENS" != "0" ] && echo "🪙 Tokens: $TOKENS"
 [ -n "$BRANCH" ] && echo "🌿 Branch: $BRANCH"

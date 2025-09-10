@@ -4,6 +4,7 @@ export interface TaskFileMetadata {
   id: string;
   title: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  repository: string;
   epic: string;
   branch?: string;
   createdAt: string;

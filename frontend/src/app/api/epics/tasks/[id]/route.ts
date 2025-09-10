@@ -4,7 +4,17 @@ import path from 'path';
 import matter from 'gray-matter';
 import { TaskFile, TaskFileMetadata } from '../route';
 
-const TASKS_DIR = path.resolve(process.cwd(), '../.claude/epics/tasks');
+const EPICS_BASE_DIR = path.resolve(process.cwd(), '../.claude/epics');
+
+// Get current repository name
+async function getCurrentRepository(): Promise<string> {
+  return process.env.REPOSITORY_NAME || 'workflow';
+}
+
+// Get tasks directory for specific repository
+function getTasksDir(repository: string): string {
+  return path.join(EPICS_BASE_DIR, 'repositories', repository, 'tasks');
+}
 
 // Get specific task file
 export async function GET(
@@ -12,6 +22,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const repository = await getCurrentRepository();
+    const TASKS_DIR = getTasksDir(repository);
     const { id } = params;
     const filename = `${id}.md`;
     const filePath = path.join(TASKS_DIR, filename);
@@ -23,6 +35,11 @@ export async function GET(
       metadata: frontMatter as TaskFileMetadata,
       content: markdownContent.trim(),
     };
+    
+    // Ensure repository field is set
+    if (!taskFile.metadata.repository) {
+      taskFile.metadata.repository = repository;
+    }
     
     return NextResponse.json(taskFile);
   } catch (error) {
@@ -42,6 +59,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const repository = await getCurrentRepository();
+    const TASKS_DIR = getTasksDir(repository);
     const { id } = params;
     const filename = `${id}.md`;
     const filePath = path.join(TASKS_DIR, filename);
@@ -51,6 +70,11 @@ export async function PUT(
     // Ensure the ID matches
     if (updatedTaskFile.metadata.id !== id) {
       return NextResponse.json({ error: 'Task ID mismatch' }, { status: 400 });
+    }
+    
+    // Ensure repository field is set correctly
+    if (!updatedTaskFile.metadata.repository) {
+      updatedTaskFile.metadata.repository = repository;
     }
     
     // Generate markdown content with frontmatter
@@ -87,6 +111,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const repository = await getCurrentRepository();
+    const TASKS_DIR = getTasksDir(repository);
     const { id } = params;
     const filename = `${id}.md`;
     const filePath = path.join(TASKS_DIR, filename);

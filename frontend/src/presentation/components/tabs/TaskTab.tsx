@@ -166,6 +166,7 @@ Task created on ${new Date().toISOString()}`;
       const taskFile = await taskFileManager.createTaskFile({
         title: taskData.title,
         status: taskData.status,
+        repository: 'workflow', // Current repository
         epic: epicName,
         branch: taskData.branch_name,
         tokensUsed: 0,

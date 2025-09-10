@@ -2,6 +2,7 @@
 id: ""
 title: ""
 status: "pending"
+repository: "workflow"
 epic: ""
 branch: ""
 createdAt: ""
@@ -16,6 +17,9 @@ lintStatus: ""
 ---
 
 # Task: {title}
+
+## Repository
+**workflow** (JokerTrickster/workflow)
 
 ## Epic
 {epic}
