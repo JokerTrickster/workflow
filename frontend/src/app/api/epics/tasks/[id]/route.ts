@@ -22,7 +22,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const repository = await getCurrentRepository();
+    const { searchParams } = new URL(request.url);
+    const repository = searchParams.get('repository') || 'workflow';
     const TASKS_DIR = getTasksDir(repository);
     const { id } = params;
     const filename = `${id}.md`;
@@ -59,7 +60,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const repository = await getCurrentRepository();
+    const { searchParams } = new URL(request.url);
+    const repository = searchParams.get('repository') || 'workflow';
     const TASKS_DIR = getTasksDir(repository);
     const { id } = params;
     const filename = `${id}.md`;
@@ -111,7 +113,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const repository = await getCurrentRepository();
+    const { searchParams } = new URL(request.url);
+    const repository = searchParams.get('repository') || 'workflow';
     const TASKS_DIR = getTasksDir(repository);
     const { id } = params;
     const filename = `${id}.md`;

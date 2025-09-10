@@ -85,7 +85,8 @@ export function TaskTab({ repository }: TaskTabProps) {
     try {
       // Clear cache to ensure fresh data
       taskFileManager.clearCache();
-      const loadedTasks = await taskFileManager.loadTasksFromEpics();
+      // Use repository name from props
+      const loadedTasks = await taskFileManager.loadTasksFromEpics(repository.name);
       setTasks(loadedTasks);
     } catch (error) {
       console.error('Failed to load tasks:', error);
@@ -175,7 +176,7 @@ Task created on ${new Date().toISOString()}`;
       const taskFile = await taskFileManager.createTaskFile({
         title: taskData.title,
         status: taskData.status,
-        repository: 'workflow', // Current repository
+        repository: repository.name, // Use actual repository name
         epic: epicName,
         branch: taskData.branch_name,
         tokensUsed: 0,
@@ -183,7 +184,7 @@ Task created on ${new Date().toISOString()}`;
         prUrl: taskData.pr_url,
         buildStatus: taskData.build_status,
         lintStatus: taskData.lint_status,
-      }, taskContent);
+      }, taskContent, repository.name);
 
       // Reload tasks to show the new one
       await loadTasks();
@@ -240,7 +241,7 @@ Task created on ${new Date().toISOString()}`;
         status: 'in_progress',
         startedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      });
+      }, undefined, repository.name);
       
       // Reload tasks to reflect changes
       await loadTasks();

@@ -38,7 +38,7 @@ export class TaskFileManager {
     return TaskFileManager.instance;
   }
 
-  async loadTasksFromEpics(): Promise<Task[]> {
+  async loadTasksFromEpics(repositoryName?: string): Promise<Task[]> {
     try {
       // Check cache validity
       const now = Date.now();
@@ -46,10 +46,17 @@ export class TaskFileManager {
         return this.convertTaskFilesToTasks(Array.from(this.taskCache.values()));
       }
 
-      // Load tasks from backend API with cache-busting
-      const response = await fetch('/api/epics/tasks?' + new URLSearchParams({
+      // Prepare query parameters
+      const queryParams: Record<string, string> = {
         _t: Date.now().toString()  // Cache-busting timestamp
-      }), {
+      };
+      
+      if (repositoryName) {
+        queryParams.repository = repositoryName;
+      }
+
+      // Load tasks from backend API with cache-busting
+      const response = await fetch('/api/epics/tasks?' + new URLSearchParams(queryParams), {
         cache: 'no-cache',
         headers: {
           'Cache-Control': 'no-cache',
@@ -76,7 +83,7 @@ export class TaskFileManager {
     }
   }
 
-  async createTaskFile(taskData: Omit<TaskFileMetadata, 'id' | 'createdAt' | 'updatedAt'>, content: string): Promise<TaskFile> {
+  async createTaskFile(taskData: Omit<TaskFileMetadata, 'id' | 'createdAt' | 'updatedAt'>, content: string, repositoryName?: string): Promise<TaskFile> {
     const taskFile: TaskFile = {
       metadata: {
         id: this.generateTaskId(),
@@ -88,7 +95,10 @@ export class TaskFileManager {
     };
 
     try {
-      const response = await fetch('/api/epics/tasks', {
+      // Prepare query parameters if repository is specified
+      const queryParams = repositoryName ? `?repository=${encodeURIComponent(repositoryName)}` : '';
+      
+      const response = await fetch('/api/epics/tasks' + queryParams, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,7 +122,7 @@ export class TaskFileManager {
     }
   }
 
-  async updateTaskFile(taskId: string, updates: Partial<TaskFileMetadata>, content?: string): Promise<TaskFile> {
+  async updateTaskFile(taskId: string, updates: Partial<TaskFileMetadata>, content?: string, repositoryName?: string): Promise<TaskFile> {
     try {
       const existingTask = this.taskCache.get(taskId);
       if (!existingTask) {
@@ -128,7 +138,10 @@ export class TaskFileManager {
         content: content || existingTask.content,
       };
 
-      const response = await fetch(`/api/epics/tasks/${taskId}`, {
+      // Prepare query parameters if repository is specified
+      const queryParams = repositoryName ? `?repository=${encodeURIComponent(repositoryName)}` : '';
+      
+      const response = await fetch(`/api/epics/tasks/${taskId}` + queryParams, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -152,7 +165,7 @@ export class TaskFileManager {
     }
   }
 
-  async getTaskFile(taskId: string): Promise<TaskFile | null> {
+  async getTaskFile(taskId: string, repositoryName?: string): Promise<TaskFile | null> {
     try {
       // Check cache first
       const cached = this.taskCache.get(taskId);
@@ -161,7 +174,8 @@ export class TaskFileManager {
       }
 
       // Fetch from API
-      const response = await fetch(`/api/epics/tasks/${taskId}`);
+      const queryParams = repositoryName ? `?repository=${encodeURIComponent(repositoryName)}` : '';
+      const response = await fetch(`/api/epics/tasks/${taskId}` + queryParams);
       if (!response.ok) {
         if (response.status === 404) {
           return null;

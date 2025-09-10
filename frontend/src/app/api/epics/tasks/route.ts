@@ -55,9 +55,11 @@ async function ensureTasksDir(repository: string) {
 }
 
 // Get all task files for current repository
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const repository = await getCurrentRepository();
+    // Get repository from query parameter or default to 'workflow'
+    const { searchParams } = new URL(request.url);
+    const repository = searchParams.get('repository') || 'workflow';
     const TASKS_DIR = getTasksDir(repository);
     
     await ensureTasksDir(repository);
@@ -117,7 +119,9 @@ export async function GET() {
 // Create new task file
 export async function POST(request: NextRequest) {
   try {
-    const repository = await getCurrentRepository();
+    // Get repository from query parameter or default to 'workflow'
+    const { searchParams } = new URL(request.url);
+    const repository = searchParams.get('repository') || 'workflow';
     const TASKS_DIR = getTasksDir(repository);
     
     await ensureTasksDir(repository);
