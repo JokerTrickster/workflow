@@ -27,7 +27,7 @@ export class TaskFileManager {
   private static instance: TaskFileManager;
   private taskCache: Map<string, TaskFile> = new Map();
   private lastCacheUpdate = 0;
-  private readonly CACHE_TTL = 5000; // 5 seconds
+  private readonly CACHE_TTL = 1000; // 1 second (reduced for testing)
 
   private constructor() {}
 
@@ -46,8 +46,16 @@ export class TaskFileManager {
         return this.convertTaskFilesToTasks(Array.from(this.taskCache.values()));
       }
 
-      // Load tasks from backend API
-      const response = await fetch('/api/epics/tasks');
+      // Load tasks from backend API with cache-busting
+      const response = await fetch('/api/epics/tasks?' + new URLSearchParams({
+        _t: Date.now().toString()  // Cache-busting timestamp
+      }), {
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       if (!response.ok) {
         throw new Error(`Failed to load tasks: ${response.statusText}`);
       }

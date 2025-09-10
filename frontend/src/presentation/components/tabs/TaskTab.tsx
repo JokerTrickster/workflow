@@ -70,12 +70,21 @@ export function TaskTab({ repository }: TaskTabProps) {
 
   // Load tasks from epic files on component mount
   useEffect(() => {
+    // Clear any local storage cache if it exists
+    try {
+      localStorage.removeItem('tasks-cache');
+      sessionStorage.removeItem('tasks-cache');
+    } catch (error) {
+      // Ignore storage errors
+    }
     loadTasks();
   }, []);
 
   const loadTasks = async () => {
     setIsLoadingTasks(true);
     try {
+      // Clear cache to ensure fresh data
+      taskFileManager.clearCache();
       const loadedTasks = await taskFileManager.loadTasksFromEpics();
       setTasks(loadedTasks);
     } catch (error) {

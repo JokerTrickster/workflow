@@ -100,7 +100,14 @@ export async function GET() {
     // Sort by updated date (newest first)
     tasks.sort((a, b) => new Date(b.metadata.updatedAt).getTime() - new Date(a.metadata.updatedAt).getTime());
     
-    return NextResponse.json(tasks);
+    const response = NextResponse.json(tasks);
+    
+    // Add cache-busting headers
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     console.error('Failed to load tasks:', error);
     return NextResponse.json({ error: 'Failed to load tasks' }, { status: 500 });
