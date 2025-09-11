@@ -173,7 +173,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container mx-auto max-w-7xl px-4 py-8 px-safe-4">
+      <main className="container mx-auto px-4 py-8 px-safe-4">
         {/* Network Status Banner */}
         {!isOnline && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -189,85 +189,86 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar with filters */}
-          <div className="lg:w-80 shrink-0">
-            <ErrorBoundary 
-              level="component"
-              fallback={(error, resetError) => (
-                <Card className="border-red-200 bg-red-50">
-                  <CardHeader>
-                    <CardTitle className="text-red-900 flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5" />
-                      Filter Error
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-red-700 mb-4">
-                      The search filters encountered an error.
-                    </p>
-                    <Button variant="outline" onClick={resetError}>
-                      Reset Filters
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-            >
-              <SearchFilter
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                languageFilter={languageFilter}
-                onLanguageChange={setLanguageFilter}
-                connectionFilter={connectionFilter}
-                onConnectionFilterChange={setConnectionFilter}
-                availableLanguages={availableLanguages}
-                isLoading={isLoading}
-              />
-            </ErrorBoundary>
-          </div>
-
-          {/* Main content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold">Your Repositories</h1>
-                <p className="text-sm text-muted-foreground">
-                  {isLoading 
-                    ? 'Loading repositories...' 
-                    : repositories 
-                      ? `${filteredRepositories.length} of ${repositories.length} repositories`
-                      : 'No repositories found'
-                  }
-                </p>
+        {/* Header with title and controls */}
+        <div className="mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl font-bold">Your Repositories</h1>
+              <p className="text-muted-foreground mt-1">
+                {isLoading 
+                  ? 'Loading repositories...' 
+                  : repositories 
+                    ? `${filteredRepositories.length} of ${repositories.length} repositories`
+                    : 'No repositories found'
+                }
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Network status indicator */}
+              <div className="flex items-center gap-1 text-xs">
+                {isOnline ? (
+                  <>
+                    <Wifi className="h-3 w-3 text-green-500" />
+                    <span className="text-green-600">Online</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="h-3 w-3 text-red-500" />
+                    <span className="text-red-600">Offline</span>
+                  </>
+                )}
               </div>
               
-              <div className="flex items-center gap-2">
-                {/* Network status indicator */}
-                <div className="flex items-center gap-1 text-xs">
-                  {isOnline ? (
-                    <>
-                      <Wifi className="h-3 w-3 text-green-500" />
-                      <span className="text-green-600">Online</span>
-                    </>
-                  ) : (
-                    <>
-                      <WifiOff className="h-3 w-3 text-red-500" />
-                      <span className="text-red-600">Offline</span>
-                    </>
-                  )}
-                </div>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRetry}
-                  disabled={isLoading || isRefetching}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${(isLoading || isRefetching) ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRetry}
+                disabled={isLoading || isRefetching}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${(isLoading || isRefetching) ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
+          </div>
+
+          {/* Filters - Now as a horizontal bar */}
+          <ErrorBoundary 
+            level="component"
+            fallback={(error, resetError) => (
+              <Card className="border-red-200 bg-red-50 mb-6">
+                <CardHeader>
+                  <CardTitle className="text-red-900 flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5" />
+                    Filter Error
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-red-700 mb-4">
+                    The search filters encountered an error.
+                  </p>
+                  <Button variant="outline" onClick={resetError}>
+                    Reset Filters
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          >
+            <SearchFilter
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              languageFilter={languageFilter}
+              onLanguageChange={setLanguageFilter}
+              connectionFilter={connectionFilter}
+              onConnectionFilterChange={setConnectionFilter}
+              availableLanguages={availableLanguages}
+              isLoading={isLoading}
+            />
+          </ErrorBoundary>
+        </div>
+
+        {/* Main content - Full width */}
+        <div className="w-full">
 
             {/* Error States */}
             {error && (
