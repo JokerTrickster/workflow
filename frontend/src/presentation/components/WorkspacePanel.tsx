@@ -21,13 +21,32 @@ interface WorkspacePanelProps {
 export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
   const [activeTab, setActiveTab] = useState<string>('tasks');
 
-  // Tab state persistence
+  // Clear all caches when repository changes and restore tab state
   useEffect(() => {
+    // Aggressive cache clearing for new repository
+    try {
+      // Clear all possible cache keys
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('tasks') || key.includes('cache')) {
+          localStorage.removeItem(key);
+        }
+      });
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.includes('tasks') || key.includes('cache')) {
+          sessionStorage.removeItem(key);
+        }
+      });
+    } catch (error) {
+      // Ignore storage errors
+      console.warn('Failed to clear cache:', error);
+    }
+
+    // Restore tab state for this repository
     const savedTab = localStorage.getItem(`workspace-tab-${repository.id}`);
     if (savedTab && ['tasks', 'logs', 'dashboard'].includes(savedTab)) {
       setActiveTab(savedTab);
     }
-  }, [repository.id]);
+  }, [repository.id, repository.name]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);

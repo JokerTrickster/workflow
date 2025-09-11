@@ -104,10 +104,14 @@ export async function GET(request: NextRequest) {
     
     const response = NextResponse.json(tasks);
     
-    // Add cache-busting headers
-    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    // Add aggressive cache-busting headers
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, private');
     response.headers.set('Pragma', 'no-cache');
     response.headers.set('Expires', '0');
+    response.headers.set('Last-Modified', new Date().toUTCString());
+    response.headers.set('ETag', `"${Date.now()}-${Math.random().toString(36).substring(2)}"`);
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('X-Force-Fresh', 'true');
     
     return response;
   } catch (error) {

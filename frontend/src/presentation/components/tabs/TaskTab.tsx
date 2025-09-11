@@ -71,17 +71,23 @@ export function TaskTab({ repository }: TaskTabProps) {
   const activityLogger = ActivityLogger.getInstance();
   const taskFileManager = TaskFileManager.getInstance();
 
-  // Load tasks from epic files on component mount
+  // Load tasks from epic files on component mount and repository change
   useEffect(() => {
     // Clear any local storage cache if it exists
     try {
       localStorage.removeItem('tasks-cache');
       sessionStorage.removeItem('tasks-cache');
+      // Clear all potential cache keys
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('tasks') || key.includes('epic') || key.includes('workflow')) {
+          localStorage.removeItem(key);
+        }
+      });
     } catch (error) {
       // Ignore storage errors
     }
     loadTasks();
-  }, []);
+  }, [repository.id, repository.name]); // Reload when repository changes
 
   const loadTasks = async (forceRefresh = true) => {
     setIsLoadingTasks(true);

@@ -69,10 +69,13 @@ export class TaskFileManager {
         method: 'GET',
         cache: 'no-store',
         headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
           'Pragma': 'no-cache',
           'Expires': '0',
-          'If-None-Match': '*'
+          'If-None-Match': '*',
+          'If-Modified-Since': 'Thu, 01 Jan 1970 00:00:00 GMT',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-Force-Refresh': 'true'
         }
       });
       if (!response.ok) {
