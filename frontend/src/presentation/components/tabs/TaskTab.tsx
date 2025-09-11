@@ -92,10 +92,27 @@ export function TaskTab({ repository }: TaskTabProps) {
       // Clear all caches to ensure fresh data
       taskFileManager.clearCache();
       
-      // Clear browser cache for this component
+      // Aggressive browser cache clearing
       try {
+        // Clear specific repository caches
         localStorage.removeItem(`tasks-${repository.name}`);
         sessionStorage.removeItem(`tasks-${repository.name}`);
+        
+        // Clear all related cache keys
+        ['tasks', 'epic', 'github', 'issues', 'prs', 'cache', 'api'].forEach(prefix => {
+          Object.keys(localStorage).forEach(key => {
+            if (key.includes(prefix) && key.includes(repository.name)) {
+              localStorage.removeItem(key);
+            }
+          });
+          Object.keys(sessionStorage).forEach(key => {
+            if (key.includes(prefix) && key.includes(repository.name)) {
+              sessionStorage.removeItem(key);
+            }
+          });
+        });
+        
+        console.log('🧹 TaskTab: Cleared all caches for', repository.name);
       } catch {
         // Ignore storage errors
       }

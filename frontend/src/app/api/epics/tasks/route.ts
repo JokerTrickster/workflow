@@ -108,14 +108,21 @@ export async function GET(request: NextRequest) {
     
     const response = NextResponse.json(tasks);
     
-    // Add aggressive cache-busting headers
-    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, private');
+    // Add ultra-aggressive cache-busting headers
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, private, no-transform');
     response.headers.set('Pragma', 'no-cache');
     response.headers.set('Expires', '0');
     response.headers.set('Last-Modified', new Date().toUTCString());
-    response.headers.set('ETag', `"${Date.now()}-${Math.random().toString(36).substring(2)}"`);
+    response.headers.set('ETag', `"${Date.now()}-${Math.random().toString(36).substring(2)}-${repository}"`);
     response.headers.set('X-Content-Type-Options', 'nosniff');
     response.headers.set('X-Force-Fresh', 'true');
+    response.headers.set('X-No-Cache', 'true');
+    response.headers.set('X-Repository', repository);
+    response.headers.set('X-Timestamp', Date.now().toString());
+    response.headers.set('Vary', 'Accept, Accept-Encoding, Accept-Language, User-Agent');
+    response.headers.set('X-Cache-Status', 'MISS');
+    response.headers.set('X-Served-By', 'fresh-data');
+    console.log('🚛 API Response: Serving fresh data for repository:', repository, 'with', tasks.length, 'tasks');
     
     return response;
   } catch (error) {

@@ -280,9 +280,37 @@ export class TaskFileManager {
     return `task-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   }
 
-  // Utility method to clear cache
+  // Enhanced utility method to clear all caches
   clearCache(): void {
+    console.log('🧹 TaskFileManager: Clearing all caches');
+    
+    // Clear internal cache
     this.taskCache.clear();
     this.lastCacheUpdate = 0;
+    
+    // Clear browser storage caches
+    try {
+      if (typeof window !== 'undefined') {
+        // Clear localStorage
+        Object.keys(localStorage).forEach(key => {
+          if (key.includes('tasks') || key.includes('epic') || key.includes('github')) {
+            localStorage.removeItem(key);
+            console.log('Cleared localStorage:', key);
+          }
+        });
+        
+        // Clear sessionStorage  
+        Object.keys(sessionStorage).forEach(key => {
+          if (key.includes('tasks') || key.includes('epic') || key.includes('github')) {
+            sessionStorage.removeItem(key);
+            console.log('Cleared sessionStorage:', key);
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to clear browser storage:', error);
+    }
+    
+    console.log('✅ TaskFileManager: All caches cleared');
   }
 }

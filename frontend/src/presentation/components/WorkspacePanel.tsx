@@ -23,23 +23,79 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
 
   // Clear all caches when repository changes and restore tab state
   useEffect(() => {
-    // Aggressive cache clearing for new repository
-    try {
-      // Clear all possible cache keys
-      Object.keys(localStorage).forEach(key => {
-        if (key.includes('tasks') || key.includes('cache')) {
-          localStorage.removeItem(key);
+    // Complete cache clearing function
+    const clearAllCaches = () => {
+      try {
+        console.log('🧹 Starting complete cache cleanup for repository:', repository.name);
+        
+        // Clear localStorage completely
+        Object.keys(localStorage).forEach(key => {
+          if (key.includes('tasks') || key.includes('cache') || key.includes('github') || key.includes('repo') || key.includes('issues') || key.includes('prs')) {
+            localStorage.removeItem(key);
+            console.log('Cleared localStorage key:', key);
+          }
+        });
+        
+        // Clear sessionStorage completely  
+        Object.keys(sessionStorage).forEach(key => {
+          if (key.includes('tasks') || key.includes('cache') || key.includes('github') || key.includes('repo') || key.includes('issues') || key.includes('prs')) {
+            sessionStorage.removeItem(key);
+            console.log('Cleared sessionStorage key:', key);
+          }
+        });
+        
+        // Clear IndexedDB if available
+        if ('indexedDB' in window) {
+          try {
+            indexedDB.deleteDatabase('cache-db');
+            indexedDB.deleteDatabase('tasks-db');
+            console.log('Cleared IndexedDB databases');
+          } catch (e) {
+            // Ignore IndexedDB errors
+          }
         }
-      });
-      Object.keys(sessionStorage).forEach(key => {
-        if (key.includes('tasks') || key.includes('cache')) {
-          sessionStorage.removeItem(key);
+        
+        // Clear any service worker caches if available
+        if ('serviceWorker' in navigator && 'caches' in window) {
+          caches.keys().then(cacheNames => {
+            const deletePromises = cacheNames
+              .filter(cacheName => 
+                cacheName.includes('api') || 
+                cacheName.includes('tasks') || 
+                cacheName.includes('github') ||
+                cacheName.includes('next')
+              )
+              .map(cacheName => {
+                console.log('Deleting cache:', cacheName);
+                return caches.delete(cacheName);
+              });
+            return Promise.all(deletePromises);
+          }).then(() => {
+            console.log('Service Worker caches cleared');
+          }).catch(() => {
+            // Ignore cache errors
+          });
         }
-      });
-    } catch (error) {
-      // Ignore storage errors
-      console.warn('Failed to clear cache:', error);
-    }
+        
+        // Force clear any React Query cache if available
+        if (typeof window !== 'undefined' && (window as any).queryClient) {
+          (window as any).queryClient.clear();
+          console.log('React Query cache cleared');
+        }
+        
+        console.log('🧽 Complete cache cleanup completed for repository:', repository.name);
+      } catch (error) {
+        console.warn('Cache clearing failed:', error);
+      }
+    };
+    
+    // Execute cache clearing immediately
+    clearAllCaches();
+    
+    // Also clear cache when component unmounts
+    return () => {
+      clearAllCaches();
+    };
 
     // Restore tab state for this repository
     const savedTab = localStorage.getItem(`workspace-tab-${repository.id}`);
