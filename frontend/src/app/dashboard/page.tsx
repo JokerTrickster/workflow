@@ -425,7 +425,6 @@ export default function Dashboard() {
                 />
               </ErrorBoundary>
             )}
-          </div>
         </div>
       </main>
     </div>
