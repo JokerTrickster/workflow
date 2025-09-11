@@ -173,7 +173,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="w-full px-6 py-8">
+      <main className="container mx-auto max-w-7xl px-6 py-8">
         {/* Network Status Banner */}
         {!isOnline && (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
