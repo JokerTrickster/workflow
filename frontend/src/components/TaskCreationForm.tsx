@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Task } from '../domain/entities/Task';
 import { GitHubIssue, GitHubPullRequest } from '../types/github';
 import { Button } from './ui/button';
@@ -66,14 +66,15 @@ export function TaskCreationForm({
     branchName?: string;
   }>({});
 
-  // Clear specific error when user starts typing
-  const clearError = (field: keyof typeof errors) => {
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
-    }
-  };
+  // Clear specific error when user starts typing (memoized)
+  const clearError = useCallback((field: keyof typeof errors) => {
+    setErrors(prev => {
+      if (!prev[field]) return prev; // No change needed
+      return { ...prev, [field]: undefined };
+    });
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate mandatory fields
@@ -106,7 +107,7 @@ export function TaskCreationForm({
     };
 
     await onSubmit(taskData);
-  };
+  }, [title, description, branchName, repositoryId, githubPullRequest, onSubmit]);
 
   const getGitHubMetadata = () => {
     if (!githubItem) return null;
