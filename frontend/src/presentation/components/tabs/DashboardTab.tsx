@@ -20,11 +20,20 @@ import {
   ExternalLink,
   Loader2,
   RefreshCw,
-  Calendar,
   Target,
   Activity,
-  Download
+  Download,
+  Eye,
+  GitMerge,
+  MessageSquare
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../../../components/ui/dialog';
 import { useGitHubIssues } from '../../../hooks/useGitHubIssues';
 import { useGitHubPullRequests } from '../../../hooks/useGitHubPullRequests';
 import { useTasks } from '../../../hooks/useTasks';
@@ -191,6 +200,9 @@ const MetricCard = ({
 
 export function DashboardTab({ repository }: DashboardTabProps) {
   const [timeRange, setTimeRange] = useState<string>('30d');
+  const [selectedIssue, setSelectedIssue] = useState<any>(null);
+  const [selectedPR, setSelectedPR] = useState<any>(null);
+  const [isIssueMerging, setIsIssueMerging] = useState(false);
   
   // Get GitHub data
   const { 
@@ -319,6 +331,41 @@ export function DashboardTab({ repository }: DashboardTabProps) {
     refetchPRs();
     refetchTasks();
     refetchEvents();
+  };
+
+  const handleMergePR = async (pr: any) => {
+    setIsIssueMerging(true);
+    try {
+      const response = await fetch(`/api/github/repos/${repository.full_name}/pulls/${pr.number}/merge`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          commit_title: `Merge pull request #${pr.number} from ${pr.head.label}`,
+          commit_message: pr.title,
+          merge_method: 'merge', // or 'squash', 'rebase'
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to merge PR');
+      }
+
+      const result = await response.json();
+      console.log('PR merged successfully:', result);
+      
+      // Refresh PR data and close modal
+      refetchPRs();
+      setSelectedPR(null);
+      
+    } catch (error) {
+      console.error('Failed to merge PR:', error);
+      alert('Failed to merge PR: ' + (error as Error).message);
+    } finally {
+      setIsIssueMerging(false);
+    }
   };
 
   const handleExport = () => {
@@ -794,6 +841,290 @@ export function DashboardTab({ repository }: DashboardTabProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Issues and Pull Requests Lists */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Issues */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Recent Issues
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {issuesLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : issuesData?.issues?.slice(0, 5).map((issue: any) => (
+                <div
+                  key={issue.id}
+                  className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                  onClick={() => setSelectedIssue(issue)}
+                >
+                  <div className={`w-2 h-2 rounded-full mt-2 ${
+                    issue.state === 'open' ? 'bg-green-500' : 'bg-red-500'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="text-sm font-medium truncate">
+                        #{issue.number} {issue.title}
+                      </h4>
+                      <Badge variant="outline" className="text-xs">
+                        {issue.state}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>by {issue.user?.login}</span>
+                      <span>•</span>
+                      <span>{new Date(issue.created_at).toLocaleDateString()}</span>
+                      <span>•</span>
+                      <div className="flex items-center gap-1">
+                        <MessageSquare className="h-3 w-3" />
+                        {issue.comments}
+                      </div>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              )) || (
+                <div className="text-center py-4 text-muted-foreground">
+                  <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No issues found</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Pull Requests */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <GitPullRequest className="h-5 w-5 text-blue-500" />
+              Recent Pull Requests
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {prsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : prsData?.pullRequests?.slice(0, 5).map((pr: any) => (
+                <div
+                  key={pr.id}
+                  className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                  onClick={() => setSelectedPR(pr)}
+                >
+                  <div className={`w-2 h-2 rounded-full mt-2 ${
+                    pr.state === 'open' ? 'bg-green-500' : 
+                    pr.merged ? 'bg-purple-500' : 'bg-red-500'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="text-sm font-medium truncate">
+                        #{pr.number} {pr.title}
+                      </h4>
+                      <Badge variant={pr.merged ? "default" : "outline"} className="text-xs">
+                        {pr.merged ? 'merged' : pr.state}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>by {pr.user?.login}</span>
+                      <span>•</span>
+                      <span>{new Date(pr.created_at).toLocaleDateString()}</span>
+                      <span>•</span>
+                      <div className="flex items-center gap-1">
+                        <MessageSquare className="h-3 w-3" />
+                        {pr.comments}
+                      </div>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              )) || (
+                <div className="text-center py-4 text-muted-foreground">
+                  <GitPullRequest className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No pull requests found</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Issue Detail Modal */}
+      <Dialog open={!!selectedIssue} onOpenChange={() => setSelectedIssue(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          {selectedIssue && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-red-500" />
+                  Issue #{selectedIssue.number}: {selectedIssue.title}
+                </DialogTitle>
+                <DialogDescription>
+                  Created by {selectedIssue.user?.login} on {new Date(selectedIssue.created_at).toLocaleDateString()}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant={selectedIssue.state === 'open' ? 'default' : 'secondary'}>
+                    {selectedIssue.state}
+                  </Badge>
+                  {selectedIssue.labels?.map((label: any) => (
+                    <Badge key={label.id} variant="outline" style={{ color: `#${label.color}` }}>
+                      {label.name}
+                    </Badge>
+                  ))}
+                </div>
+
+                {selectedIssue.body && (
+                  <div className="prose prose-sm max-w-none">
+                    <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg">
+                      {selectedIssue.body}
+                    </pre>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="h-4 w-4" />
+                    {selectedIssue.comments} comments
+                  </div>
+                  {selectedIssue.assignee && (
+                    <div className="flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      Assigned to {selectedIssue.assignee.login}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setSelectedIssue(null)}>
+                    Close
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <a href={selectedIssue.html_url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View on GitHub
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* PR Detail Modal */}
+      <Dialog open={!!selectedPR} onOpenChange={() => setSelectedPR(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          {selectedPR && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <GitPullRequest className="h-5 w-5 text-blue-500" />
+                  PR #{selectedPR.number}: {selectedPR.title}
+                </DialogTitle>
+                <DialogDescription>
+                  Created by {selectedPR.user?.login} on {new Date(selectedPR.created_at).toLocaleDateString()}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant={
+                    selectedPR.merged ? 'default' : 
+                    selectedPR.state === 'open' ? 'secondary' : 'outline'
+                  }>
+                    {selectedPR.merged ? 'merged' : selectedPR.state}
+                  </Badge>
+                  {selectedPR.labels?.map((label: any) => (
+                    <Badge key={label.id} variant="outline" style={{ color: `#${label.color}` }}>
+                      {label.name}
+                    </Badge>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">From:</span> {selectedPR.head?.label}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">To:</span> {selectedPR.base?.label}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Commits:</span> {selectedPR.commits}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Files changed:</span> {selectedPR.changed_files}
+                  </div>
+                </div>
+
+                {selectedPR.body && (
+                  <div className="prose prose-sm max-w-none">
+                    <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg">
+                      {selectedPR.body}
+                    </pre>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="h-4 w-4" />
+                    {selectedPR.comments} comments
+                  </div>
+                  <div className="flex items-center gap-1 text-green-600">
+                    +{selectedPR.additions} additions
+                  </div>
+                  <div className="flex items-center gap-1 text-red-600">
+                    -{selectedPR.deletions} deletions
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setSelectedPR(null)}>
+                    Close
+                  </Button>
+                  {selectedPR.state === 'open' && selectedPR.mergeable && !selectedPR.merged && (
+                    <Button 
+                      onClick={() => handleMergePR(selectedPR)}
+                      disabled={isIssueMerging}
+                    >
+                      {isIssueMerging ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Merging...
+                        </>
+                      ) : (
+                        <>
+                          <GitMerge className="h-4 w-4 mr-2" />
+                          Merge PR
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  <Button variant="outline" asChild>
+                    <a href={selectedPR.html_url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View on GitHub
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
