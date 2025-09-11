@@ -1084,6 +1084,7 @@ Task created on ${new Date().toISOString()}`;
   };
 
   return (
+    <>
     <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="w-full h-full flex flex-col">
       <TabsList className="grid w-full grid-cols-3 mb-6">
         <TabsTrigger value="tasks" className="flex items-center gap-2">
@@ -1244,5 +1245,6 @@ Task created on ${new Date().toISOString()}`;
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }
