@@ -10,6 +10,13 @@ import { Badge } from '../../../components/ui/badge';
 import { Input } from '../../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Separator } from '../../../components/ui/separator';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../../../components/ui/dialog';
 import { 
   Activity, 
   Search, 
@@ -25,7 +32,9 @@ import {
   Users,
   ExternalLink,
   Trash2,
-  BarChart3
+  BarChart3,
+  Eye,
+  Info
 } from 'lucide-react';
 
 interface LogsTabProps {
@@ -90,6 +99,7 @@ export function LogsTab({ repository }: LogsTabProps) {
     total: number;
     recentActivity: number;
   } | null>(null);
+  const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
   
   const activityLogger = ActivityLogger.getInstance();
 
@@ -188,6 +198,10 @@ export function LogsTab({ repository }: LogsTabProps) {
     if (confirm('Are you sure you want to clear all activity logs? This action cannot be undone.')) {
       activityLogger.clearLogs();
     }
+  };
+
+  const handleLogClick = (log: ActivityLog) => {
+    setSelectedLog(log);
   };
   
   return (
@@ -305,7 +319,11 @@ export function LogsTab({ repository }: LogsTabProps) {
             </div>
             
             {filteredLogs.map((log, index) => (
-              <Card key={log.id} className="overflow-hidden">
+              <Card 
+                key={log.id} 
+                className="overflow-hidden cursor-pointer hover:bg-muted/50 transition-colors group"
+                onClick={() => handleLogClick(log)}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     {/* Activity Icon */}
@@ -315,19 +333,40 @@ export function LogsTab({ repository }: LogsTabProps) {
                     
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium text-sm">{log.title}</h3>
-                        <Badge 
-                          variant="secondary" 
-                          className={`text-xs ${getActivityBadgeColor(log.type)}`}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-sm">{log.title}</h3>
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs ${getActivityBadgeColor(log.type)}`}
+                          >
+                            {log.type}
+                          </Badge>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLogClick(log);
+                          }}
                         >
-                          {log.type}
-                        </Badge>
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       </div>
                       
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {log.description}
+                      <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                        {log.description.length > 100 
+                          ? `${log.description.substring(0, 100)}...` 
+                          : log.description
+                        }
                       </p>
+                      
+                      {/* Click hint */}
+                      <div className="text-xs text-muted-foreground/70 mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Click to view full details
+                      </div>
                       
                       {/* Metadata */}
                       {log.metadata && Object.keys(log.metadata).length > 0 && (
@@ -408,6 +447,197 @@ export function LogsTab({ repository }: LogsTabProps) {
           </>
         )}
       </div>
+
+      {/* Log Detail Modal */}
+      <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          {selectedLog && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    {getActivityIcon(selectedLog.type, selectedLog.level)}
+                    <span>{selectedLog.title}</span>
+                    <Badge 
+                      variant="secondary" 
+                      className={`text-xs ${getActivityBadgeColor(selectedLog.type)}`}
+                    >
+                      {selectedLog.type}
+                    </Badge>
+                  </div>
+                </DialogTitle>
+                <DialogDescription>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    <time dateTime={selectedLog.timestamp}>
+                      {new Date(selectedLog.timestamp).toLocaleString()}
+                    </time>
+                    <span>•</span>
+                    <span>{formatRelativeTime(selectedLog.timestamp)}</span>
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {/* Main Description */}
+                <div>
+                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <Info className="h-4 w-4" />
+                    Description
+                  </h4>
+                  <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                    {selectedLog.description}
+                  </p>
+                </div>
+
+                {/* Activity Level */}
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Level</h4>
+                  <Badge 
+                    variant={selectedLog.level === 'error' ? 'destructive' : selectedLog.level === 'warning' ? 'secondary' : 'default'}
+                    className="capitalize"
+                  >
+                    {selectedLog.level}
+                  </Badge>
+                </div>
+
+                {/* Metadata Details */}
+                {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-3">Metadata</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {selectedLog.metadata.repositoryName && (
+                        <div className="bg-muted p-3 rounded-md">
+                          <div className="text-xs font-medium text-muted-foreground mb-1">Repository</div>
+                          <div className="text-sm">{selectedLog.metadata.repositoryName}</div>
+                        </div>
+                      )}
+                      
+                      {selectedLog.metadata.taskTitle && (
+                        <div className="bg-blue-50 p-3 rounded-md">
+                          <div className="text-xs font-medium text-blue-600 mb-1">Task</div>
+                          <div className="text-sm text-blue-800">{selectedLog.metadata.taskTitle}</div>
+                        </div>
+                      )}
+                      
+                      {selectedLog.metadata.branchName && (
+                        <div className="bg-purple-50 p-3 rounded-md">
+                          <div className="text-xs font-medium text-purple-600 mb-1">Branch</div>
+                          <div className="text-sm text-purple-800 flex items-center gap-1">
+                            <GitBranch className="h-3 w-3" />
+                            {selectedLog.metadata.branchName}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedLog.metadata.duration && (
+                        <div className="bg-green-50 p-3 rounded-md">
+                          <div className="text-xs font-medium text-green-600 mb-1">Duration</div>
+                          <div className="text-sm text-green-800 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {Math.round(selectedLog.metadata.duration / 1000)}s ({selectedLog.metadata.duration}ms)
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedLog.metadata.issueNumber && (
+                        <div className="bg-orange-50 p-3 rounded-md">
+                          <div className="text-xs font-medium text-orange-600 mb-1">GitHub Issue</div>
+                          <div className="text-sm text-orange-800 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            Issue #{selectedLog.metadata.issueNumber}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedLog.metadata.prNumber && (
+                        <div className="bg-cyan-50 p-3 rounded-md">
+                          <div className="text-xs font-medium text-cyan-600 mb-1">Pull Request</div>
+                          <div className="text-sm text-cyan-800 flex items-center gap-1">
+                            <GitPullRequest className="h-3 w-3" />
+                            PR #{selectedLog.metadata.prNumber}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedLog.metadata.rateLimitRemaining !== undefined && (
+                        <div className="bg-yellow-50 p-3 rounded-md">
+                          <div className="text-xs font-medium text-yellow-600 mb-1">Rate Limit</div>
+                          <div className="text-sm text-yellow-800">
+                            {selectedLog.metadata.rateLimitRemaining} requests remaining
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedLog.metadata.userAgent && (
+                        <div className="bg-gray-50 p-3 rounded-md">
+                          <div className="text-xs font-medium text-gray-600 mb-1">User Agent</div>
+                          <div className="text-xs text-gray-700 font-mono truncate" title={selectedLog.metadata.userAgent}>
+                            {selectedLog.metadata.userAgent}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedLog.metadata.requestId && (
+                        <div className="bg-gray-50 p-3 rounded-md">
+                          <div className="text-xs font-medium text-gray-600 mb-1">Request ID</div>
+                          <div className="text-xs text-gray-700 font-mono">
+                            {selectedLog.metadata.requestId}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Error Message */}
+                {selectedLog.metadata?.errorMessage && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-2 text-red-600 flex items-center gap-2">
+                      <XCircle className="h-4 w-4" />
+                      Error Details
+                    </h4>
+                    <div className="bg-red-50 border border-red-200 p-3 rounded-md">
+                      <pre className="text-sm text-red-800 whitespace-pre-wrap font-mono">
+                        {selectedLog.metadata.errorMessage}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+                
+                {/* External Links */}
+                {(selectedLog.metadata?.prUrl || selectedLog.metadata?.githubUrl) && (
+                  <div className="flex gap-2">
+                    {selectedLog.metadata.prUrl && (
+                      <Button variant="outline" asChild>
+                        <a href={selectedLog.metadata.prUrl} target="_blank" rel="noopener noreferrer">
+                          <GitPullRequest className="h-4 w-4 mr-2" />
+                          View Pull Request
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </a>
+                      </Button>
+                    )}
+                    {selectedLog.metadata.githubUrl && (
+                      <Button variant="outline" asChild>
+                        <a href={selectedLog.metadata.githubUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View on GitHub
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex justify-end">
+                  <Button variant="outline" onClick={() => setSelectedLog(null)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
