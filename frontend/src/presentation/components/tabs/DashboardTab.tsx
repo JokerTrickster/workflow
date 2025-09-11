@@ -2,6 +2,65 @@
 
 import { useState, useMemo } from 'react';
 import { Repository } from '../../../domain/entities/Repository';
+
+// Type definitions for GitHub API responses
+interface GitHubIssue {
+  id: number;
+  number: number;
+  title: string;
+  body: string;
+  state: 'open' | 'closed';
+  created_at: string;
+  updated_at: string;
+  closed_at?: string;
+  user: {
+    login: string;
+    avatar_url: string;
+  };
+  labels: Array<{
+    name: string;
+    color: string;
+  }>;
+  assignees: Array<{
+    login: string;
+    avatar_url: string;
+  }>;
+  assignee?: {
+    login: string;
+    avatar_url: string;
+  };
+  comments: number;
+  html_url: string;
+}
+
+interface GitHubPullRequest {
+  id: number;
+  number: number;
+  title: string;
+  body: string;
+  state: 'open' | 'closed';
+  created_at: string;
+  updated_at: string;
+  closed_at?: string;
+  merged_at?: string;
+  merged?: boolean;
+  user: {
+    login: string;
+    avatar_url: string;
+  };
+  head: {
+    label: string;
+    sha: string;
+  };
+  base: {
+    label: string;
+    sha: string;
+  };
+  mergeable?: boolean;
+  mergeable_state?: string;
+  comments: number;
+  html_url: string;
+}
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
@@ -61,19 +120,19 @@ interface TaskStats {
 }
 
 // Helper to filter data by time range
-const filterByTimeRange = (items: any[], timeRange: string): any[] => {
+const filterByTimeRange = (items: { created_at: string }[], timeRange: string): { created_at: string }[] => {
   if (timeRange === 'all') return items;
   
   const now = new Date();
   const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
   const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   
-  return items.filter(item => new Date(item.created_at) >= cutoff);
+  return items.filter((item: { created_at: string }) => new Date(item.created_at) >= cutoff);
 };
 
 // Helper to calculate task statistics from real task data
-const calculateTaskStats = (tasks: any[], timeRange: string): TaskStats => {
-  const filteredTasks = filterByTimeRange(tasks, timeRange);
+const calculateTaskStats = (tasks: { status: string; created_at: string; completed_at?: string; started_at?: string }[], timeRange: string): TaskStats => {
+  const filteredTasks = filterByTimeRange(tasks as { created_at: string }[], timeRange) as typeof tasks;
   
   const completed = filteredTasks.filter(t => t.status === 'completed').length;
   const inProgress = filteredTasks.filter(t => t.status === 'in_progress').length;
@@ -200,8 +259,8 @@ const MetricCard = ({
 
 export function DashboardTab({ repository }: DashboardTabProps) {
   const [timeRange, setTimeRange] = useState<string>('30d');
-  const [selectedIssue, setSelectedIssue] = useState<any>(null);
-  const [selectedPR, setSelectedPR] = useState<any>(null);
+  const [selectedIssue, setSelectedIssue] = useState<GitHubIssue | null>(null);
+  const [selectedPR, setSelectedPR] = useState<GitHubPullRequest | null>(null);
   const [isIssueMerging, setIsIssueMerging] = useState(false);
   
   // Get GitHub data
@@ -333,7 +392,7 @@ export function DashboardTab({ repository }: DashboardTabProps) {
     refetchEvents();
   };
 
-  const handleMergePR = async (pr: any) => {
+  const handleMergePR = async (pr: GitHubPullRequest) => {
     setIsIssueMerging(true);
     try {
       const response = await fetch(`/api/github/repos/${repository.full_name}/pulls/${pr.number}/merge`, {
@@ -700,8 +759,8 @@ export function DashboardTab({ repository }: DashboardTabProps) {
             <div>
               <span className="text-sm font-medium">Recent Activity</span>
               <div className="mt-2 grid grid-cols-7 gap-1">
-                {taskStats.recentActivity.map((day, index) => (
-                  <div key={index} className="text-center">
+                {taskStats.recentActivity.map((day) => (
+                  <div key={day.date} className="text-center">
                     <div className="text-xs text-muted-foreground mb-1">
                       {new Date(day.date).getDate()}
                     </div>

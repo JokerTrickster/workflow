@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Repository } from '../../../domain/entities/Repository';
 import { Task } from '../../../domain/entities/Task';
 import { TaskCreationForm } from '../../../components/TaskCreationForm';
@@ -26,7 +26,6 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
-  Users,
   Tag,
   MessageCircle,
   GitMerge,
@@ -35,10 +34,8 @@ import {
   Filter,
   User,
   UserCheck,
-  UserMinus,
   GitCommit,
   ChevronDown,
-  Star,
   X
 } from 'lucide-react';
 import {
@@ -82,14 +79,14 @@ export function TaskTab({ repository }: TaskTabProps) {
         if (key.includes('tasks') || key.includes('epic') || key.includes('workflow')) {
           localStorage.removeItem(key);
         }
-      });
-    } catch (error) {
+      });    
+    } catch {
       // Ignore storage errors
     }
     loadTasks();
   }, [repository.id, repository.name]); // Reload when repository changes
 
-  const loadTasks = async (forceRefresh = true) => {
+  const loadTasks = useCallback(async (forceRefresh = true) => {
     setIsLoadingTasks(true);
     try {
       // Clear all caches to ensure fresh data
@@ -99,7 +96,7 @@ export function TaskTab({ repository }: TaskTabProps) {
       try {
         localStorage.removeItem(`tasks-${repository.name}`);
         sessionStorage.removeItem(`tasks-${repository.name}`);
-      } catch (error) {
+      } catch {
         // Ignore storage errors
       }
       
@@ -113,7 +110,7 @@ export function TaskTab({ repository }: TaskTabProps) {
     } finally {
       setIsLoadingTasks(false);
     }
-  };
+  }, [repository.name]);
 
   // Handle task detail viewing
   const handleTaskClick = async (task: Task) => {

@@ -176,7 +176,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
                   </CardHeader>
                   <CardContent>
                     <p className="text-red-700 mb-4">
-                      The tasks tab encountered an error and couldn't load properly.
+                      The tasks tab encountered an error and couldn&apos;t load properly.
                     </p>
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={resetError}>
@@ -222,7 +222,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
                   </CardHeader>
                   <CardContent>
                     <p className="text-red-700 mb-4">
-                      The activity logs tab encountered an error and couldn't load properly.
+                      The activity logs tab encountered an error and couldn&apos;t load properly.
                     </p>
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={resetError}>
@@ -268,7 +268,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
                   </CardHeader>
                   <CardContent>
                     <p className="text-red-700 mb-4">
-                      The dashboard tab encountered an error and couldn't load properly.
+                      The dashboard tab encountered an error and couldn&apos;t load properly.
                     </p>
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={resetError}>
