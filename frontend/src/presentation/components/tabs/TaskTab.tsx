@@ -38,7 +38,8 @@ import {
   UserMinus,
   GitCommit,
   ChevronDown,
-  Star
+  Star,
+  X
 } from 'lucide-react';
 import {
   Dialog,
@@ -1209,6 +1210,7 @@ Task created on ${new Date().toISOString()}`;
                 Close
               </Button>
               
+              {/* Pending Task Actions */}
               {selectedTask.status === 'pending' && (
                 <Button 
                   onClick={async () => {
@@ -1238,6 +1240,69 @@ Task created on ${new Date().toISOString()}`;
                 >
                   <Play className="h-4 w-4 mr-2" />
                   Start Task
+                </Button>
+              )}
+
+              {/* In Progress Task Actions */}
+              {selectedTask.status === 'in_progress' && (
+                <>
+                  <Button 
+                    variant="destructive"
+                    onClick={async () => {
+                      try {
+                        // Update task status to cancelled
+                        await taskFileManager.updateTaskFile(
+                          selectedTask.id,
+                          { 
+                            status: 'cancelled',
+                            cancelledAt: new Date().toISOString()
+                          },
+                          undefined,
+                          repository.name
+                        );
+                        
+                        // Log activity
+                        activityLogger.logTaskCancelled(selectedTask.id, selectedTask.title);
+                        
+                        // Refresh tasks list
+                        await loadTasks();
+                        
+                        handleCloseTaskDetail();
+                      } catch (error) {
+                        console.error('Failed to cancel task:', error);
+                      }
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel Task
+                  </Button>
+                  
+                  <Button 
+                    onClick={async () => {
+                      try {
+                        // Log resume activity
+                        activityLogger.logTaskResumed(selectedTask.id, selectedTask.title);
+                        
+                        // Close modal and let user continue working
+                        handleCloseTaskDetail();
+                      } catch (error) {
+                        console.error('Failed to resume task:', error);
+                      }
+                    }}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Resume Task
+                  </Button>
+                </>
+              )}
+
+              {/* Completed Task Actions */}
+              {selectedTask.status === 'completed' && selectedTask.pr_url && (
+                <Button variant="outline" asChild>
+                  <a href={selectedTask.pr_url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View PR
+                  </a>
                 </Button>
               )}
             </div>

@@ -121,8 +121,9 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 container mx-auto max-w-7xl px-4 py-6 px-safe-4">
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full h-full flex flex-col">
+      <div className="flex-1 overflow-hidden">
+        <div className="container mx-auto max-w-7xl px-4 py-6 px-safe-4 h-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full h-full flex flex-col">
           <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="tasks" className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4" />
@@ -138,7 +139,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="tasks" className="space-y-4 flex-1 overflow-y-auto">
+          <TabsContent value="tasks" className="space-y-4 flex-1 overflow-y-auto min-h-0">
             <ErrorBoundary 
               level="component" 
               showDetails={process.env.NODE_ENV === 'development'}
@@ -185,7 +186,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
             </ErrorBoundary>
           </TabsContent>
 
-          <TabsContent value="logs" className="space-y-4 flex-1 overflow-y-auto">
+          <TabsContent value="logs" className="space-y-4 flex-1 overflow-y-auto min-h-0">
             <ErrorBoundary 
               level="component" 
               showDetails={process.env.NODE_ENV === 'development'}
@@ -231,7 +232,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
             </ErrorBoundary>
           </TabsContent>
 
-          <TabsContent value="dashboard" className="space-y-4 flex-1 overflow-y-auto">
+          <TabsContent value="dashboard" className="space-y-4 flex-1 overflow-y-auto min-h-0">
             <ErrorBoundary 
               level="component" 
               showDetails={process.env.NODE_ENV === 'development'}
@@ -276,7 +277,8 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
               <DashboardTab repository={repository} />
             </ErrorBoundary>
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </div>
       </div>
     </div>
   );

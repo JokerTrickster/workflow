@@ -283,6 +283,36 @@ export class ActivityLogger {
     );
   }
 
+  public logTaskCancelled(taskId: string, taskTitle: string): void {
+    this.log(
+      'task',
+      'warning',
+      'Task cancelled',
+      `Task "${taskTitle}" was cancelled`,
+      {
+        taskId,
+        taskTitle,
+        taskStatus: 'cancelled',
+        userAction: 'task_cancelled' as ActivityEventType
+      }
+    );
+  }
+
+  public logTaskResumed(taskId: string, taskTitle: string): void {
+    this.log(
+      'task',
+      'info',
+      'Task resumed',
+      `Task "${taskTitle}" execution resumed`,
+      {
+        taskId,
+        taskTitle,
+        taskStatus: 'in_progress',
+        userAction: 'task_resumed' as ActivityEventType
+      }
+    );
+  }
+
   /**
    * GitHub-related events
    */
