@@ -3,6 +3,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import matter from 'gray-matter';
 
+// Force dynamic rendering - no static generation
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export interface TaskFileMetadata {
   id: string;
   title: string;

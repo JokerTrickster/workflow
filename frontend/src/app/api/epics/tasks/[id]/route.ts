@@ -4,6 +4,10 @@ import path from 'path';
 import matter from 'gray-matter';
 import { TaskFile, TaskFileMetadata } from '../route';
 
+// Force dynamic rendering - no static generation
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const EPICS_BASE_DIR = path.resolve(process.cwd(), '../.claude/epics');
 
 // Get current repository name
