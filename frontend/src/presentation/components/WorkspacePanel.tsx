@@ -138,7 +138,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="tasks" className="space-y-4 h-full overflow-y-auto">
+          <TabsContent value="tasks" className="space-y-4 flex-1 overflow-y-auto">
             <ErrorBoundary 
               level="component" 
               showDetails={process.env.NODE_ENV === 'development'}
@@ -185,7 +185,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
             </ErrorBoundary>
           </TabsContent>
 
-          <TabsContent value="logs" className="space-y-4 h-full overflow-y-auto">
+          <TabsContent value="logs" className="space-y-4 flex-1 overflow-y-auto">
             <ErrorBoundary 
               level="component" 
               showDetails={process.env.NODE_ENV === 'development'}
@@ -231,7 +231,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
             </ErrorBoundary>
           </TabsContent>
 
-          <TabsContent value="dashboard" className="space-y-4 h-full overflow-y-auto">
+          <TabsContent value="dashboard" className="space-y-4 flex-1 overflow-y-auto">
             <ErrorBoundary 
               level="component" 
               showDetails={process.env.NODE_ENV === 'development'}

@@ -64,6 +64,8 @@ export function TaskTab({ repository }: TaskTabProps) {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [selectedGitHubIssue, setSelectedGitHubIssue] = useState<GitHubIssue | undefined>();
   const [selectedGitHubPR, setSelectedGitHubPR] = useState<GitHubPullRequest | undefined>();
+  const [selectedTask, setSelectedTask] = useState<Task | undefined>();
+  const [showTaskDetailDialog, setShowTaskDetailDialog] = useState(false);
   
   const activityLogger = ActivityLogger.getInstance();
   const taskFileManager = TaskFileManager.getInstance();
@@ -80,19 +82,55 @@ export function TaskTab({ repository }: TaskTabProps) {
     loadTasks();
   }, []);
 
-  const loadTasks = async () => {
+  const loadTasks = async (forceRefresh = true) => {
     setIsLoadingTasks(true);
     try {
-      // Clear cache to ensure fresh data
+      // Clear all caches to ensure fresh data
       taskFileManager.clearCache();
-      // Use repository name from props
-      const loadedTasks = await taskFileManager.loadTasksFromEpics(repository.name);
+      
+      // Clear browser cache for this component
+      try {
+        localStorage.removeItem(`tasks-${repository.name}`);
+        sessionStorage.removeItem(`tasks-${repository.name}`);
+      } catch (error) {
+        // Ignore storage errors
+      }
+      
+      // Use repository name from props with force refresh
+      const loadedTasks = await taskFileManager.loadTasksFromEpics(repository.name, forceRefresh);
       setTasks(loadedTasks);
+      
+      console.log(`Loaded ${loadedTasks.length} tasks for repository: ${repository.name}`);
     } catch (error) {
       console.error('Failed to load tasks:', error);
     } finally {
       setIsLoadingTasks(false);
     }
+  };
+
+  // Handle task detail viewing
+  const handleTaskClick = async (task: Task) => {
+    try {
+      // Get full task file content
+      const taskFile = await taskFileManager.getTaskFile(task.id, repository.name);
+      if (taskFile) {
+        setSelectedTask({
+          ...task,
+          description: taskFile.content // Use full content instead of truncated description
+        });
+        setShowTaskDetailDialog(true);
+      }
+    } catch (error) {
+      console.error('Failed to load task details:', error);
+      // Still show basic task info if file loading fails
+      setSelectedTask(task);
+      setShowTaskDetailDialog(true);
+    }
+  };
+
+  const handleCloseTaskDetail = () => {
+    setSelectedTask(undefined);
+    setShowTaskDetailDialog(false);
   };
   
   // GitHub Issues and PRs state
@@ -457,7 +495,7 @@ Task created on ${new Date().toISOString()}`;
 
   // Render functions for each tab
   const renderTasks = () => (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h3 className="text-lg font-semibold">Local Tasks</h3>
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -513,9 +551,13 @@ Task created on ${new Date().toISOString()}`;
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 flex-1 overflow-y-auto">
           {tasks.map((task) => (
-          <Card key={task.id}>
+          <Card 
+            key={task.id} 
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleTaskClick(task)}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-1 flex-1">
@@ -1088,5 +1130,119 @@ Task created on ${new Date().toISOString()}`;
         )}
       </TabsContent>
     </Tabs>
+
+    {/* Task Detail Modal */}
+    <Dialog open={showTaskDetailDialog} onOpenChange={setShowTaskDetailDialog}>
+      <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {selectedTask && getStatusIcon(selectedTask.status)}
+            {selectedTask?.title}
+          </DialogTitle>
+          <DialogDescription>
+            Task details and content
+          </DialogDescription>
+        </DialogHeader>
+        
+        {selectedTask && (
+          <div className="space-y-6">
+            {/* Task Metadata */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Status</label>
+                <div className="mt-1">
+                  <Badge className={getStatusColor(selectedTask.status)}>
+                    {selectedTask.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Created</label>
+                <div className="mt-1 text-sm">
+                  {new Date(selectedTask.created_at).toLocaleDateString()}
+                </div>
+              </div>
+              
+              {selectedTask.branch_name && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Branch</label>
+                  <div className="mt-1 flex items-center gap-1 text-sm">
+                    <GitBranch className="h-3 w-3" />
+                    {selectedTask.branch_name}
+                  </div>
+                </div>
+              )}
+              
+              {selectedTask.pr_url && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Pull Request</label>
+                  <div className="mt-1">
+                    <a 
+                      href={selectedTask.pr_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      View PR
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Task Content */}
+            <div>
+              <label className="text-sm font-medium text-muted-foreground">Content</label>
+              <div className="mt-2 p-4 bg-muted rounded-lg">
+                <pre className="whitespace-pre-wrap text-sm font-mono">
+                  {selectedTask.description}
+                </pre>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={handleCloseTaskDetail}>
+                Close
+              </Button>
+              
+              {selectedTask.status === 'pending' && (
+                <Button 
+                  onClick={async () => {
+                    try {
+                      // Update task status to in_progress
+                      await taskFileManager.updateTaskFile(
+                        selectedTask.id,
+                        { 
+                          status: 'in_progress',
+                          startedAt: new Date().toISOString()
+                        },
+                        undefined,
+                        repository.name
+                      );
+                      
+                      // Log activity
+                      activityLogger.logTaskStarted(selectedTask.id, selectedTask.title);
+                      
+                      // Refresh tasks list
+                      await loadTasks();
+                      
+                      handleCloseTaskDetail();
+                    } catch (error) {
+                      console.error('Failed to start task:', error);
+                    }
+                  }}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Task
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -40,29 +40,39 @@ export class TaskFileManager {
     return TaskFileManager.instance;
   }
 
-  async loadTasksFromEpics(repositoryName?: string): Promise<Task[]> {
+  async loadTasksFromEpics(repositoryName?: string, forceRefresh = false): Promise<Task[]> {
     try {
-      // Check cache validity
+      // Force cache clear if requested
+      if (forceRefresh) {
+        this.clearCache();
+      }
+
+      // Check cache validity (skip cache if force refresh)
       const now = Date.now();
-      if (now - this.lastCacheUpdate < this.CACHE_TTL && this.taskCache.size > 0) {
+      if (!forceRefresh && now - this.lastCacheUpdate < this.CACHE_TTL && this.taskCache.size > 0) {
         return this.convertTaskFilesToTasks(Array.from(this.taskCache.values()));
       }
 
-      // Prepare query parameters
+      // Prepare query parameters with stronger cache busting
       const queryParams: Record<string, string> = {
-        _t: Date.now().toString()  // Cache-busting timestamp
+        _t: Date.now().toString(),  // Cache-busting timestamp
+        _r: Math.random().toString(36).substring(2),  // Random string
+        _v: '2'  // Version parameter
       };
       
       if (repositoryName) {
         queryParams.repository = repositoryName;
       }
 
-      // Load tasks from backend API with cache-busting
+      // Load tasks from backend API with aggressive cache-busting
       const response = await fetch('/api/epics/tasks?' + new URLSearchParams(queryParams), {
-        cache: 'no-cache',
+        method: 'GET',
+        cache: 'no-store',
         headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'If-None-Match': '*'
         }
       });
       if (!response.ok) {
