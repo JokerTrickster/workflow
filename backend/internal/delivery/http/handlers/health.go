@@ -16,8 +16,8 @@ func NewHealthHandler() *HealthHandler {
 	return &HealthHandler{}
 }
 
-// HealthCheck returns the health status of the application
-func (h *HealthHandler) HealthCheck(c echo.Context) error {
+// Health returns the health status of the application
+func (h *HealthHandler) Health(c echo.Context) error {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 

@@ -2,16 +2,25 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+
+	"ai-git-workbench/internal/domain/entities"
+	"ai-git-workbench/internal/domain/repositories"
 )
 
 // TaskHandler handles task-related endpoints
-type TaskHandler struct{}
+type TaskHandler struct {
+	taskRepo repositories.TaskRepository
+}
 
 // NewTaskHandler creates a new TaskHandler
-func NewTaskHandler() *TaskHandler {
-	return &TaskHandler{}
+func NewTaskHandler(taskRepo repositories.TaskRepository) *TaskHandler {
+	return &TaskHandler{
+		taskRepo: taskRepo,
+	}
 }
 
 // Task represents a task entity for API responses
@@ -21,7 +30,8 @@ type Task struct {
 	Description string            `json:"description"`
 	Status      string            `json:"status"`
 	Repository  string            `json:"repository"`
-	Epic        string            `json:"epic"`
+	UserID      string            `json:"user_id"`
+	Epic        string            `json:"epic,omitempty"`
 	Branch      string            `json:"branch,omitempty"`
 	CreatedAt   string            `json:"created_at"`
 	UpdatedAt   string            `json:"updated_at"`
@@ -33,89 +43,159 @@ type Task struct {
 
 // GetTasks returns all tasks
 func (h *TaskHandler) GetTasks(c echo.Context) error {
-	// Mock data for testing
-	tasks := []Task{
-		{
-			ID:          "task-1",
-			Title:       "Implement user authentication",
-			Description: "Add JWT-based authentication to the API",
-			Status:      "in_progress",
-			Repository:  "workflow",
-			Epic:        "authentication",
-			Branch:      "feature/auth",
-			CreatedAt:   "2024-01-15T10:00:00Z",
-			UpdatedAt:   "2024-01-15T14:30:00Z",
-			StartedAt:   "2024-01-15T11:00:00Z",
-			TokensUsed:  1500,
-		},
-		{
-			ID:          "task-2", 
-			Title:       "Setup database migrations",
-			Description: "Create initial database schema and migration system",
-			Status:      "completed",
-			Repository:  "workflow",
-			Epic:        "infrastructure", 
-			Branch:      "feature/db-setup",
-			CreatedAt:   "2024-01-14T09:00:00Z",
-			UpdatedAt:   "2024-01-15T16:00:00Z",
-			StartedAt:   "2024-01-14T10:00:00Z",
-			CompletedAt: "2024-01-15T16:00:00Z",
-			TokensUsed:  2300,
-		},
+	ctx := c.Request().Context()
+	
+	// Parse query parameters for filtering
+	userID := c.QueryParam("user_id")
+	status := c.QueryParam("status")
+	repository := c.QueryParam("repository")
+	
+	filter := repositories.TaskFilter{
+		UserID:     userID,
+		Repository: repository,
+	}
+	
+	// Validate status if provided
+	if status != "" {
+		if !entities.IsValidStatus(status) {
+			return echo.NewHTTPError(http.StatusBadRequest, "Invalid status value")
+		}
+		filter.Status = entities.TaskStatus(status)
+	}
+	
+	// Get tasks from repository
+	tasks, err := h.taskRepo.List(ctx, filter)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Error retrieving tasks: "+err.Error())
+	}
+	
+	// Convert to API response format
+	apiTasks := make([]Task, len(tasks))
+	for i, task := range tasks {
+		apiTasks[i] = h.entityToAPI(task)
+	}
+	
+	// Get total count
+	total, err := h.taskRepo.Count(ctx, filter)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Error counting tasks: "+err.Error())
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"tasks": tasks,
-		"total": len(tasks),
+		"tasks": apiTasks,
+		"total": total,
 		"status": "success",
 	})
 }
 
 // GetTask returns a single task by ID
 func (h *TaskHandler) GetTask(c echo.Context) error {
+	ctx := c.Request().Context()
 	taskID := c.Param("id")
 	
-	// Mock task data
-	task := Task{
-		ID:          taskID,
-		Title:       "Sample Task",
-		Description: "This is a sample task for testing",
-		Status:      "pending",
-		Repository:  "workflow",
-		Epic:        "development",
-		CreatedAt:   "2024-01-15T10:00:00Z",
-		UpdatedAt:   "2024-01-15T10:00:00Z",
-		TokensUsed:  0,
+	// Get task from repository
+	task, err := h.taskRepo.GetByID(ctx, taskID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "Task not found: "+err.Error())
 	}
+	
+	// Convert to API response format
+	apiTask := h.entityToAPI(task)
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"task": task,
+		"task": apiTask,
 		"status": "success",
 	})
 }
 
 // CreateTask creates a new task
 func (h *TaskHandler) CreateTask(c echo.Context) error {
+	ctx := c.Request().Context()
+	
 	var req Task
 	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body: "+err.Error())
+	}
+	
+	// Validate required fields
+	if req.Title == "" || req.Repository == "" || req.UserID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "Missing required fields: title, repository, user_id")
+	}
+	
+	// Convert API request to domain entity
+	task := &entities.Task{
+		ID:         uuid.New().String(),
+		BranchName: req.Branch,
+		Title:      req.Title,
+		Content:    req.Description,
+		Repository: req.Repository,
+		UserID:     req.UserID,
+		Status:     entities.TaskStatusPending,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+		Metadata:   req.Metadata,
+	}
+	
+	// Create task in repository
+	if err := h.taskRepo.Create(ctx, task); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Error creating task: "+err.Error())
 	}
 
-	// Mock creation response
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"message": "Task created successfully",
-		"task_id": "new-task-123",
+		"task_id": task.ID,
 		"status": "success",
 	})
 }
 
 // UpdateTask updates an existing task
 func (h *TaskHandler) UpdateTask(c echo.Context) error {
+	ctx := c.Request().Context()
 	taskID := c.Param("id")
 	
 	var req Task
 	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body")
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request body: "+err.Error())
+	}
+	
+	// Get existing task first
+	existingTask, err := h.taskRepo.GetByID(ctx, taskID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "Task not found: "+err.Error())
+	}
+	
+	// Update fields if provided
+	if req.Title != "" {
+		existingTask.Title = req.Title
+	}
+	if req.Description != "" {
+		existingTask.Content = req.Description
+	}
+	if req.Branch != "" {
+		existingTask.BranchName = req.Branch
+	}
+	if req.Repository != "" {
+		existingTask.Repository = req.Repository
+	}
+	if req.Status != "" {
+		if !entities.IsValidStatus(req.Status) {
+			return echo.NewHTTPError(http.StatusBadRequest, "Invalid status value")
+		}
+		newStatus := entities.TaskStatus(req.Status)
+		if !existingTask.CanTransitionTo(newStatus) {
+			return echo.NewHTTPError(http.StatusBadRequest, "Invalid status transition")
+		}
+		existingTask.Status = newStatus
+	}
+	if req.Metadata != nil {
+		existingTask.Metadata = req.Metadata
+	}
+	
+	existingTask.UpdatedAt = time.Now()
+	
+	// Update task in repository
+	if err := h.taskRepo.Update(ctx, existingTask); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Error updating task: "+err.Error())
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -127,11 +207,37 @@ func (h *TaskHandler) UpdateTask(c echo.Context) error {
 
 // DeleteTask deletes a task
 func (h *TaskHandler) DeleteTask(c echo.Context) error {
+	ctx := c.Request().Context()
 	taskID := c.Param("id")
+	
+	// Delete task from repository
+	if err := h.taskRepo.Delete(ctx, taskID); err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "Task not found: "+err.Error())
+	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"message": "Task deleted successfully", 
 		"task_id": taskID,
 		"status": "success",
 	})
+}
+
+// Helper function to convert domain entity to API response
+func (h *TaskHandler) entityToAPI(task *entities.Task) Task {
+	return Task{
+		ID:          task.ID,
+		Title:       task.Title,
+		Description: task.Content,
+		Status:      string(task.Status),
+		Repository:  task.Repository,
+		UserID:      task.UserID,
+		Epic:        "", // Epic is not part of the current domain model
+		Branch:      task.BranchName,
+		CreatedAt:   task.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   task.UpdatedAt.Format(time.RFC3339),
+		StartedAt:   "", // StartedAt is not part of the current domain model
+		CompletedAt: "", // CompletedAt is not part of the current domain model
+		TokensUsed:  0,  // TokensUsed is not part of the current domain model
+		Metadata:    task.Metadata,
+	}
 }
