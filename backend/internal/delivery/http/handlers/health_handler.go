@@ -141,3 +141,34 @@ func (h *HealthHandler) Metrics(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, metrics)
 }
+
+// SimpleHealthHandler provides basic health endpoints without dependencies
+type SimpleHealthHandler struct{}
+
+// Health handles basic health check
+func (h *SimpleHealthHandler) Health(c echo.Context) error {
+	return c.JSON(http.StatusOK, HealthResponse{
+		Status:    "healthy",
+		Timestamp: time.Now().Format(time.RFC3339),
+		Service:   "task-queue-api",
+		Version:   "1.0.0",
+		Uptime:    time.Since(startTime).String(),
+	})
+}
+
+// Live handles liveness probe
+func (h *SimpleHealthHandler) Live(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"status":    "alive",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"uptime":    time.Since(startTime).String(),
+	})
+}
+
+// Ready handles readiness probe
+func (h *SimpleHealthHandler) Ready(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"status":    "ready",
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+}

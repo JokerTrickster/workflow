@@ -13,13 +13,6 @@ func getCurrentTimestampRFC3339() string {
 	return time.Now().Format(time.RFC3339)
 }
 
-// getRequestID extracts request ID from context or returns "unknown"
-func getRequestID(c echo.Context) string {
-	if requestID := c.Request().Context().Value(RequestID); requestID != nil {
-		return requestID.(string)
-	}
-	return "unknown"
-}
 
 // HealthCheckMiddleware provides a simple health check endpoint bypass
 func HealthCheckMiddleware() echo.MiddlewareFunc {

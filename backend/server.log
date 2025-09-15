@@ -1,0 +1,15 @@
+2025/09/15 14:13:38 🚀 Starting Test HTTP Server...
+2025/09/15 14:13:38 🌐 Server starting on port 9090
+2025/09/15 14:13:38 🏥 Health: http://localhost:9090/health
+2025/09/15 14:13:38 📋 API: http://localhost:9090/api/ping
+⇨ http server started on [::]:9090
+2025/09/15 14:13:39 🌐 [7b223808-067b-4361-952c-db5a2d092d92] GET /health
+2025/09/15 14:13:39 ✅ [7b223808-067b-4361-952c-db5a2d092d92] GET /health - 200 (121.578µs)
+2025/09/15 14:13:43 🌐 [693abf5c-aa09-4926-b2f2-fc5172fb24c8] GET /api/ping
+2025/09/15 14:13:43 ✅ [693abf5c-aa09-4926-b2f2-fc5172fb24c8] GET /api/ping - 200 (194.594µs)
+2025/09/15 14:13:48 🌐 [1c6dfbf0-3e08-4b03-a747-3469f9dde10e] POST /api/tasks
+2025/09/15 14:13:48 ✅ [1c6dfbf0-3e08-4b03-a747-3469f9dde10e] POST /api/tasks - 201 (532.647µs)
+2025/09/15 14:13:51 🌐 [4a864c75-8b97-49da-9e7d-4f30731b6332] GET /api/tasks/b7b086e0-594e-48c7-a3a7-3eef3119727d
+2025/09/15 14:13:51 ✅ [4a864c75-8b97-49da-9e7d-4f30731b6332] GET /api/tasks/b7b086e0-594e-48c7-a3a7-3eef3119727d - 200 (153.955µs)
+2025/09/15 14:13:56 🌐 [3bcdea9b-8d26-4de3-8be9-f49df33854b2] POST /api/tasks
+2025/09/15 14:13:56 ✅ [3bcdea9b-8d26-4de3-8be9-f49df33854b2] POST /api/tasks - 400 (415.766µs)
