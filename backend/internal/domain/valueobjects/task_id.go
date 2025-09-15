@@ -58,3 +58,8 @@ func (t TaskID) Equals(other TaskID) bool {
 func (t TaskID) IsEmpty() bool {
 	return t.value == ""
 }
+
+// ParseTaskID parses a string into a TaskID (alias for NewTaskID for clarity)
+func ParseTaskID(value string) (TaskID, error) {
+	return NewTaskID(value)
+}
