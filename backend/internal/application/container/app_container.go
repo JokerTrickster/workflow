@@ -1,7 +1,10 @@
 package container
 
 import (
+	"context"
+	"fmt"
 	"log"
+	"os"
 
 	"ai-git-workbench/internal/application/interfaces"
 	"ai-git-workbench/internal/application/services"
@@ -10,6 +13,7 @@ import (
 	domainServices "ai-git-workbench/internal/domain/services"
 	"ai-git-workbench/internal/infrastructure/config"
 	"ai-git-workbench/internal/infrastructure/database"
+	"ai-git-workbench/internal/infrastructure/queue"
 	mysqlRepo "ai-git-workbench/internal/infrastructure/repositories"
 )
 
@@ -55,9 +59,23 @@ func NewApplicationContainer() (*ApplicationContainer, error) {
 	taskRepo := mysqlRepo.NewMySQLTaskRepository(db)
 	log.Printf("📦 Task repository initialized")
 
-	// Initialize queue repository (using mock for now until RabbitMQ integration is complete)
-	queueRepo := services.NewMockQueueRepository()
-	log.Printf("📨 Mock queue repository initialized")
+	// Initialize queue repository (RabbitMQ or Mock based on environment)
+	var queueRepo repositories.QueueRepository
+	var err error
+	
+	if os.Getenv("USE_RABBITMQ") == "true" {
+		queueRepo, err = queue.NewRabbitMQRepository(&cfg.RabbitMQ)
+		if err != nil {
+			log.Printf("⚠️ Failed to initialize RabbitMQ, falling back to mock: %v", err)
+			queueRepo = services.NewMockQueueRepository()
+			log.Printf("📨 Mock queue repository initialized (fallback)")
+		} else {
+			log.Printf("📨 RabbitMQ queue repository initialized")
+		}
+	} else {
+		queueRepo = services.NewMockQueueRepository()
+		log.Printf("📨 Mock queue repository initialized (default)")
+	}
 
 	// Initialize domain services
 	validationService := domainServices.NewTaskValidationService(taskRepo)
@@ -107,13 +125,16 @@ func (c *ApplicationContainer) Close() error {
 		}
 	}
 
-	// TODO: Close queue repository connection when implemented
-	// if c.QueueRepository != nil {
-	//     if err := c.QueueRepository.Close(); err != nil {
-	//         log.Printf("❌ Error closing queue repository: %v", err)
-	//         return err
-	//     }
-	// }
+	// Close queue repository connection
+	if c.QueueRepository != nil {
+		// Check if it's the RabbitMQ implementation that has a Close method
+		if closer, ok := c.QueueRepository.(interface{ Close() error }); ok {
+			if err := closer.Close(); err != nil {
+				log.Printf("❌ Error closing queue repository: %v", err)
+				return err
+			}
+		}
+	}
 
 	log.Printf("✅ Application container resources closed successfully")
 	return nil
@@ -161,11 +182,12 @@ func (c *ApplicationContainer) HealthCheck() error {
 		return err
 	}
 
-	// TODO: Check queue repository health when implemented
-	// if err := c.QueueRepository.HealthCheck(); err != nil {
-	//     log.Printf("❌ Queue repository health check failed: %v", err)
-	//     return err
-	// }
+	// Check queue repository health
+	if queueHealth, err := c.QueueRepository.GetQueueHealth(context.Background()); err != nil {
+		log.Printf("❌ Queue repository health check failed: %v", err)
+	} else if !queueHealth.IsHealthy {
+		log.Printf("⚠️ Queue repository is unhealthy: %v", queueHealth.Issues)
+	}
 
 	log.Printf("✅ Application health check passed")
 	return nil
@@ -187,8 +209,14 @@ func (c *ApplicationContainer) GetStatus() map[string]string {
 	status["authorization_service"] = "healthy"
 	status["event_service"] = "healthy"
 
-	// TODO: Add queue repository status when implemented
-	status["queue_repository"] = "placeholder"
+	// Queue repository status
+	if queueHealth, err := c.QueueRepository.GetQueueHealth(context.Background()); err != nil {
+		status["queue_repository"] = "unhealthy: " + err.Error()
+	} else if queueHealth.IsHealthy {
+		status["queue_repository"] = "healthy"
+	} else {
+		status["queue_repository"] = "unhealthy: " + fmt.Sprintf("%v", queueHealth.Issues)
+	}
 
 	return status
 }
