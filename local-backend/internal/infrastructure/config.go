@@ -33,6 +33,7 @@ type DatabaseConfig struct {
 	DSN          string `mapstructure:"dsn"`
 	MaxIdleConns int    `mapstructure:"max_idle_conns"`
 	MaxOpenConns int    `mapstructure:"max_open_conns"`
+	LogLevel     string `mapstructure:"log_level"`
 }
 
 type RabbitMQConfig struct {

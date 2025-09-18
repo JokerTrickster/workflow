@@ -12,6 +12,7 @@ database:
   dsn: "./local_backend.db"
   max_idle_conns: 10
   max_open_conns: 100
+  log_level: "info"
 
 rabbitmq:
   url: "amqp://localhost:5672/"
