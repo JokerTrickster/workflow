@@ -134,19 +134,6 @@ func (r *RequestRepositoryImpl) GetProcessingRequests(ctx context.Context) ([]*d
 
 // Additional utility methods
 
-// GetRequestsCreatedBetween retrieves requests created within a time range
-func (r *RequestRepositoryImpl) GetRequestsCreatedBetween(ctx context.Context, start, end time.Time) ([]*domain.Request, error) {
-	var requests []*domain.Request
-	err := r.db.WithContext(ctx).
-		Where("created_at BETWEEN ? AND ?", start, end).
-		Order("created_at ASC").
-		Find(&requests).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to get requests by date range: %w", err)
-	}
-	return requests, nil
-}
-
 // GetRequestsWithStatus retrieves requests with multiple statuses
 func (r *RequestRepositoryImpl) GetRequestsWithStatus(ctx context.Context, statuses []domain.RequestStatus) ([]*domain.Request, error) {
 	var requests []*domain.Request
@@ -171,4 +158,17 @@ func (r *RequestRepositoryImpl) CountByStatus(ctx context.Context, status domain
 		return 0, fmt.Errorf("failed to count requests by status: %w", err)
 	}
 	return count, nil
+}
+
+// GetRequestsCreatedBetween retrieves requests created within a time range
+func (r *RequestRepositoryImpl) GetRequestsCreatedBetween(ctx context.Context, start, end time.Time) ([]*domain.Request, error) {
+	var requests []*domain.Request
+	err := r.db.WithContext(ctx).
+		Where("created_at BETWEEN ? AND ?", start, end).
+		Order("created_at ASC").
+		Find(&requests).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get requests by date range: %w", err)
+	}
+	return requests, nil
 }

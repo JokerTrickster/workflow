@@ -47,6 +47,12 @@ type RequestService interface {
 	
 	// GetRequestsByContext returns all requests for a given context
 	GetRequestsByContext(ctx context.Context, contextID string) ([]*Request, error)
+	
+	// GetPendingRequests returns all pending requests for processing
+	GetPendingRequests(ctx context.Context) ([]*Request, error)
+	
+	// GetRequestStats returns statistics about requests
+	GetRequestStats(ctx context.Context) (map[string]interface{}, error)
 }
 
 // ContextService defines business logic for context management
@@ -59,4 +65,7 @@ type ContextService interface {
 	
 	// CleanupExpiredContexts removes old unused contexts
 	CleanupExpiredContexts(ctx context.Context) error
+	
+	// GetContextStats returns statistics about processing contexts
+	GetContextStats(ctx context.Context) (map[string]interface{}, error)
 }

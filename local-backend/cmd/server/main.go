@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -27,12 +28,22 @@ func main() {
 		config.App.Version, 
 		config.App.Environment)
 
-	// TODO: Initialize database connection
-	// TODO: Initialize RabbitMQ consumer  
-	// TODO: Initialize Claude API client
-	// TODO: Start message processing loop
+	// Initialize all services
+	orchestrator, cleanup, err := initializeServices(config)
+	if err != nil {
+		log.Fatalf("Failed to initialize services: %v", err)
+	}
+	defer cleanup()
 
-	log.Println("Local Backend Server initialized successfully")
+	// Start the orchestrator
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := orchestrator.Start(ctx); err != nil {
+		log.Fatalf("Failed to start services: %v", err)
+	}
+
+	log.Println("Local Backend Server started successfully")
 	log.Println("Ready to process messages from RabbitMQ queue")
 
 	// Wait for interrupt signal to gracefully shut down
@@ -41,6 +52,14 @@ func main() {
 	<-quit
 
 	log.Println("Shutting down Local Backend Server...")
-	// TODO: Implement graceful shutdown
+	
+	// Cancel context to stop background tasks
+	cancel()
+	
+	// Stop the orchestrator
+	if err := orchestrator.Stop(); err != nil {
+		log.Printf("Error stopping orchestrator: %v", err)
+	}
+	
 	log.Println("Server stopped")
 }

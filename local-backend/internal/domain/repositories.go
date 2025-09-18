@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"time"
 )
 
 // RequestRepository defines the interface for request data access
@@ -32,6 +33,12 @@ type RequestRepository interface {
 	
 	// GetProcessingRequests retrieves all currently processing requests
 	GetProcessingRequests(ctx context.Context) ([]*Request, error)
+	
+	// CountByStatus counts requests by status
+	CountByStatus(ctx context.Context, status RequestStatus) (int64, error)
+	
+	// GetRequestsCreatedBetween retrieves requests created within a time range
+	GetRequestsCreatedBetween(ctx context.Context, start, end time.Time) ([]*Request, error)
 }
 
 // ProcessingContextRepository defines the interface for context data access
@@ -53,4 +60,10 @@ type ProcessingContextRepository interface {
 	
 	// CleanupExpiredContexts removes old contexts
 	CleanupExpiredContexts(ctx context.Context, maxAge int64) error
+	
+	// GetContextStats returns statistics about contexts
+	GetContextStats(ctx context.Context) (map[string]interface{}, error)
+	
+	// GetContextsCreatedAfter retrieves contexts created after a specific time
+	GetContextsCreatedAfter(ctx context.Context, since time.Time) ([]*ProcessingContext, error)
 }
