@@ -290,12 +290,21 @@ func (wo *WorkflowOrchestrator) getSystemPromptForRequestType(requestType entiti
 
 // StartConsumer starts the message consumer
 func (wo *WorkflowOrchestrator) StartConsumer(ctx context.Context) error {
+	if wo.queueConsumer == nil {
+		log.Println("Queue consumer not available, starting in degraded mode")
+		// Return nil to indicate successful start in degraded mode
+		return nil
+	}
 	log.Println("Starting workflow orchestrator consumer")
 	return wo.queueConsumer.Start(ctx)
 }
 
 // StopConsumer stops the message consumer
 func (wo *WorkflowOrchestrator) StopConsumer() error {
+	if wo.queueConsumer == nil {
+		log.Println("Queue consumer not available, nothing to stop")
+		return nil
+	}
 	log.Println("Stopping workflow orchestrator consumer")
 	return wo.queueConsumer.Stop()
 }
@@ -322,7 +331,13 @@ func (wo *WorkflowOrchestrator) HealthCheck(ctx context.Context) map[string]inte
 	}
 
 	// Check message consumer
-	if err := wo.queueConsumer.Health(); err != nil {
+	if wo.queueConsumer == nil {
+		health["components"].(map[string]interface{})["message_consumer"] = map[string]interface{}{
+			"status": "unavailable",
+			"error": "Queue consumer not initialized",
+		}
+		health["status"] = "degraded"
+	} else if err := wo.queueConsumer.Health(); err != nil {
 		health["components"].(map[string]interface{})["message_consumer"] = map[string]interface{}{
 			"status": "unhealthy",
 			"error": err.Error(),
