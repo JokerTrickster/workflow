@@ -51,6 +51,11 @@ func NewConsumer(cfg *config.RabbitMQConfig, processor MessageProcessor) (*Consu
 	}, nil
 }
 
+// SetProcessor sets the message processor
+func (c *Consumer) SetProcessor(processor MessageProcessor) {
+	c.processor = processor
+}
+
 // Start begins consuming messages from the queue
 func (c *Consumer) Start(ctx context.Context) error {
 	if c.consuming {
