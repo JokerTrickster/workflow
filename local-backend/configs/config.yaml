@@ -1,0 +1,33 @@
+app:
+  name: "Local Backend Server"
+  version: "1.0.0"
+  environment: "development"
+
+server:
+  host: "localhost"
+  port: 8080
+
+database:
+  driver: "sqlite"
+  dsn: "./local_backend.db"
+  max_idle_conns: 10
+  max_open_conns: 100
+  log_level: "info"
+
+rabbitmq:
+  url: "amqp://localhost:5672/"
+  queue_name: "task_queue"
+  exchange: ""
+  routing_key: "task_queue"
+  consumer_tag: "local-backend-consumer"
+
+claude:
+  api_key: "" # Set via CLAUDE_API_KEY environment variable
+  model: "claude-3-5-sonnet-20241022" # Default model
+  max_tokens: 4096
+  timeout: 30 # seconds
+
+logging:
+  level: "info" # debug, info, warn, error
+  format: "json" # json, text
+  output: "stdout" # stdout, file
