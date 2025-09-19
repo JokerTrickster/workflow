@@ -1,72 +1,98 @@
 package config
 
 import (
-	"log"
 	"os"
 
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
-// Config holds all configuration for the application
 type Config struct {
-	Server   ServerConfig   `json:"server"`
-	Database DatabaseConfig `json:"database"`
-	GitHub   GitHubConfig   `json:"github"`
+	Server   ServerConfig   `mapstructure:"server"`
+	Database DatabaseConfig `mapstructure:"database"`
+	RabbitMQ RabbitMQConfig `mapstructure:"rabbitmq"`
+	Claude   ClaudeConfig   `mapstructure:"claude"`
+	Logging  LoggingConfig  `mapstructure:"logging"`
+	Health   HealthConfig   `mapstructure:"health"`
 }
 
-// ServerConfig holds server configuration
 type ServerConfig struct {
-	Port string `json:"port"`
-	Host string `json:"host"`
+	Port int    `mapstructure:"port"`
+	Host string `mapstructure:"host"`
 }
 
-// DatabaseConfig holds database configuration
 type DatabaseConfig struct {
-	Host     string `json:"host"`
-	Port     string `json:"port"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-	Charset  string `json:"charset"`
+	Driver         string `mapstructure:"driver"`
+	Path           string `mapstructure:"path"`
+	MaxConnections int    `mapstructure:"max_connections"`
 }
 
-// GitHubConfig holds GitHub configuration
-type GitHubConfig struct {
-	Token      string `json:"token"`
-	WebhookURL string `json:"webhook_url"`
+type RabbitMQConfig struct {
+	URL       string `mapstructure:"url"`
+	QueueName string `mapstructure:"queue_name"`
+	MaxRetries int   `mapstructure:"max_retries"`
 }
 
-// Load loads configuration from environment variables
-func Load() *Config {
-	// Try to load .env file if it exists
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using environment variables")
-	}
-
-	return &Config{
-		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
-			Host: getEnv("SERVER_HOST", "localhost"),
-		},
-		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "3306"),
-			User:     getEnv("DB_USER", "root"),
-			Password: getEnv("DB_PASSWORD", ""),
-			Name:     getEnv("DB_NAME", "workflow"),
-			Charset:  getEnv("DB_CHARSET", "utf8mb4"),
-		},
-		GitHub: GitHubConfig{
-			Token:      getEnv("GITHUB_TOKEN", ""),
-			WebhookURL: getEnv("GITHUB_WEBHOOK_URL", ""),
-		},
-	}
+type ClaudeConfig struct {
+	APIKey    string `mapstructure:"api_key"`
+	Model     string `mapstructure:"model"`
+	MaxTokens int    `mapstructure:"max_tokens"`
 }
 
-// getEnv gets environment variable with fallback
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+type LoggingConfig struct {
+	Level  string `mapstructure:"level"`
+	Format string `mapstructure:"format"`
+}
+
+type HealthConfig struct {
+	Port int `mapstructure:"port"`
+}
+
+func LoadConfig() (*Config, error) {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("./configs")
+	viper.AddConfigPath("../configs")
+	viper.AddConfigPath("../../configs")
+
+	// Environment variables
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("LOCAL_BACKEND")
+
+	// Set defaults
+	setDefaults()
+
+	// Read environment variables for sensitive data
+	if apiKey := os.Getenv("CLAUDE_API_KEY"); apiKey != "" {
+		viper.Set("claude.api_key", apiKey)
 	}
-	return defaultValue
+
+	if err := viper.ReadInConfig(); err != nil {
+		// If config file not found, use environment variables and defaults
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, err
+		}
+	}
+
+	var cfg Config
+	if err := viper.Unmarshal(&cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
+}
+
+func setDefaults() {
+	viper.SetDefault("server.port", 8080)
+	viper.SetDefault("server.host", "localhost")
+	viper.SetDefault("database.driver", "sqlite")
+	viper.SetDefault("database.path", "./data/workflow.db")
+	viper.SetDefault("database.max_connections", 10)
+	viper.SetDefault("rabbitmq.url", "amqp://localhost:5672")
+	viper.SetDefault("rabbitmq.queue_name", "workflow_queue")
+	viper.SetDefault("rabbitmq.max_retries", 3)
+	viper.SetDefault("claude.model", "claude-3-sonnet-20240229")
+	viper.SetDefault("claude.max_tokens", 4096)
+	viper.SetDefault("logging.level", "info")
+	viper.SetDefault("logging.format", "json")
+	viper.SetDefault("health.port", 8081)
 }

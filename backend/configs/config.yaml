@@ -1,0 +1,26 @@
+# Default configuration for local-backend-server
+server:
+  port: 8080
+  host: "localhost"
+
+database:
+  driver: "sqlite"
+  path: "./data/workflow.db"
+  max_connections: 10
+
+rabbitmq:
+  url: "amqp://localhost:5672"
+  queue_name: "workflow_queue"
+  max_retries: 3
+
+claude:
+  api_key: ""  # Set via environment variable
+  model: "claude-3-sonnet-20240229"
+  max_tokens: 4096
+
+logging:
+  level: "info"
+  format: "json"
+
+health:
+  port: 8081
