@@ -77,8 +77,15 @@ func (s *Session) IsExpired() bool {
 
 // ExtendExpiration extends the session expiration time
 func (s *Session) ExtendExpiration(duration time.Duration) {
-	newExpiration := time.Now().Add(duration)
-	s.ExpiresAt = &newExpiration
+	if s.ExpiresAt == nil {
+		// If no expiration is set, extend from now
+		newExpiration := time.Now().Add(duration)
+		s.ExpiresAt = &newExpiration
+	} else {
+		// Extend from current expiration time
+		newExpiration := s.ExpiresAt.Add(duration)
+		s.ExpiresAt = &newExpiration
+	}
 	s.UpdatedAt = time.Now()
 }
 
