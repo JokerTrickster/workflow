@@ -1,0 +1,10 @@
+CREATE TABLE tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+    refresh_expired_at INT,
+    user_id INT,
+    access_token VARCHAR(255),
+    refresh_token VARCHAR(255)
+);
