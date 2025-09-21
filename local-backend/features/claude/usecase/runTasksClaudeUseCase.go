@@ -129,6 +129,11 @@ func (d *RunTasksClaudeUseCase) RunTasks(c context.Context, req *request.ReqRunT
 		if taskLogPath != "" {
 			d.updateTaskLog(taskLogPath, status, errorMsg, executionError)
 		}
+
+		// 작업 완료 후 Git 커밋 및 푸시 (성공한 경우에만)
+		if status == "completed" {
+			d.autoCommitAndPush(repoPath, req.Tasks)
+		}
 	}
 
 	if executionError != nil {
@@ -381,7 +386,7 @@ func (d *RunTasksClaudeUseCase) createTaskLog(repoPath string, req *request.ReqR
 - Waiting for execution to complete...
 
 `, req.RepositoryName, req.RepositoryName, time.Now().Format("2006-01-02 15:04:05"),
-	req.WorkingDir, req.Interactive, req.Tasks, time.Now().Format("2006-01-02 15:04:05"))
+		req.WorkingDir, req.Interactive, req.Tasks, time.Now().Format("2006-01-02 15:04:05"))
 
 	// 파일 생성
 	if err := os.WriteFile(taskLogPath, []byte(content), 0644); err != nil {
@@ -457,4 +462,75 @@ func (d *RunTasksClaudeUseCase) updateTaskLog(taskLogPath, status, errorMsg stri
 	} else {
 		log.Printf("Task log updated: %s", taskLogPath)
 	}
+}
+
+// autoCommitAndPush 작업 완료 후 자동으로 Git 커밋과 푸시를 수행합니다
+func (d *RunTasksClaudeUseCase) autoCommitAndPush(repoPath, taskDescription string) {
+	log.Printf("Starting auto Git commit and push for repository: %s", repoPath)
+
+	// Git status 확인
+	statusCmd := exec.Command("git", "status", "--porcelain")
+	statusCmd.Dir = repoPath
+	statusOutput, err := statusCmd.Output()
+	if err != nil {
+		log.Printf("Failed to check git status: %v", err)
+		return
+	}
+
+	// 변경사항이 없으면 커밋하지 않음
+	if len(strings.TrimSpace(string(statusOutput))) == 0 {
+		log.Printf("No changes to commit in repository: %s", repoPath)
+		return
+	}
+
+	log.Printf("Found changes to commit: %s", string(statusOutput))
+
+	// Git add .
+	addCmd := exec.Command("git", "add", ".")
+	addCmd.Dir = repoPath
+	if err := addCmd.Run(); err != nil {
+		log.Printf("Failed to add files to git: %v", err)
+		return
+	}
+
+	// 커밋 메시지 생성
+	commitMsg := d.generateCommitMessage(taskDescription)
+
+	// Git commit
+	commitCmd := exec.Command("git", "commit", "-m", commitMsg)
+	commitCmd.Dir = repoPath
+	commitOutput, err := commitCmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Failed to commit changes: %v, output: %s", err, string(commitOutput))
+		return
+	}
+
+	log.Printf("Successfully committed changes: %s", string(commitOutput))
+
+	// Git push
+	pushCmd := exec.Command("git", "push")
+	pushCmd.Dir = repoPath
+	pushOutput, err := pushCmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Failed to push changes: %v, output: %s", err, string(pushOutput))
+		return
+	}
+
+	log.Printf("Successfully pushed changes: %s", string(pushOutput))
+	log.Printf("Auto Git commit and push completed for repository: %s", repoPath)
+}
+
+// generateCommitMessage 작업 내용을 기반으로 커밋 메시지를 생성합니다
+func (d *RunTasksClaudeUseCase) generateCommitMessage(taskDescription string) string {
+	// 작업 내용을 요약하여 커밋 메시지 생성
+	summary := taskDescription
+	if len(summary) > 100 {
+		summary = summary[:97] + "..."
+	}
+
+	return fmt.Sprintf(`%s
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>`, summary)
 }
