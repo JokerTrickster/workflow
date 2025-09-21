@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	
-	"ai-git-workbench/internal/delivery/http/handlers"
+
+	"local-backend-server/internal/delivery/http/handlers"
 )
 
 // SetupRoutes configures all the routes for the application

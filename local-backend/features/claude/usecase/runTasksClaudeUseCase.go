@@ -34,44 +34,50 @@ func (d *RunTasksClaudeUseCase) RunTasks(c context.Context, req *request.ReqRunT
 	log.Printf("Starting Claude CLI task execution: %s", req.Tasks)
 	log.Printf("Repository: %s, Working directory: %s, Continue: %v", req.RepositoryName, req.WorkingDir, req.ContinueTask)
 
+	// repository_name 필수 검증
+	if req.RepositoryName == "" {
+		log.Printf("Repository name is required")
+		return fmt.Errorf("repository_name is required")
+	}
+
 	// 레포지토리 관리 처리
 	var repo *utils.RepositoryInfo
 	var taskFilePath string
-	var err error
 
-	if req.RepositoryName != "" {
-		// 레포지토리 찾기
-		repo, err = d.RepositoryManager.FindRepository(req.RepositoryName)
-		if err != nil {
-			log.Printf("Repository not found: %v", err)
-			return fmt.Errorf("repository '%s' not found: %w", req.RepositoryName, err)
-		}
+	// 고정된 경로로 레포지토리 경로 설정
+	repoPath := fmt.Sprintf("/Users/mac/project/git-repository/%s", req.RepositoryName)
 
-		log.Printf("Found repository: %s at %s", repo.Name, repo.Path)
-
-		// 작업 파일 생성
-		taskFilePath, err = d.RepositoryManager.CreateTaskFile(repo, req.Tasks, req.ContinueTask)
-		if err != nil {
-			log.Printf("Failed to create task file: %v", err)
-			return fmt.Errorf("failed to create task file: %w", err)
-		}
-
-		log.Printf("Task file created: %s", taskFilePath)
-
-		// 작업 디렉토리 설정 (레포지토리 경로 우선)
-		if req.WorkingDir == "" {
-			req.WorkingDir = repo.Path
-		}
-
-		// 작업 기록 시작
-		record := utils.TaskRecord{
-			Timestamp:  time.Now(),
-			Task:       req.Tasks,
-			Status:     "started",
-			WorkingDir: req.WorkingDir,
-		}
-		d.RepositoryManager.SaveTaskRecord(repo, record)
+	// 레포지토리 디렉토리 존재 확인
+	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+		log.Printf("Repository directory not found: %s", repoPath)
+		return fmt.Errorf("repository '%s' not found at %s", req.RepositoryName, repoPath)
 	}
+
+	log.Printf("Using repository: %s at %s", req.RepositoryName, repoPath)
+
+	// 작업 디렉토리 설정 (레포지토리 경로 우선)
+	if req.WorkingDir == "" {
+		req.WorkingDir = repoPath
+	}
+
+	// 간단한 RepositoryInfo 구조체 생성 (로깅용)
+	repo = &utils.RepositoryInfo{
+		Name: req.RepositoryName,
+		Path: repoPath,
+		IsGitRepo: true,
+	}
+
+	// Task file 생성은 건너뛰고 단순히 로깅만 수행
+	log.Printf("Repository configured for task execution: %s", req.RepositoryName)
+
+	// 작업 기록 시작
+	record := utils.TaskRecord{
+		Timestamp:  time.Now(),
+		Task:       req.Tasks,
+		Status:     "started",
+		WorkingDir: req.WorkingDir,
+	}
+	d.RepositoryManager.SaveTaskRecord(repo, record)
 
 	// 작업 실행
 	startTime := time.Now()
@@ -106,7 +112,7 @@ func (d *RunTasksClaudeUseCase) RunTasks(c context.Context, req *request.ReqRunT
 		}
 		d.RepositoryManager.SaveTaskRecord(repo, record)
 
-		// 작업 파일 업데이트
+		// 작업 파일 업데이트는 taskFilePath가 있을 때만 수행
 		if taskFilePath != "" {
 			d.updateTaskFile(taskFilePath, status, errorMsg)
 		}
@@ -124,8 +130,8 @@ func (d *RunTasksClaudeUseCase) RunTasks(c context.Context, req *request.ReqRunT
 // executeClaude executes Claude CLI with the given task
 func (d *RunTasksClaudeUseCase) executeClaude(ctx context.Context, task string) error {
 	// Claude CLI 명령어 구성
-	// claude 명령어에 task를 전달
-	args := []string{task}
+	// claude 명령어에 task를 전달 (승인 요청 없이 실행)
+	args := []string{"--dangerously-skip-permissions", task}
 
 	// 환경변수에서 Claude CLI 경로 확인 (기본값: "claude")
 	claudeCmd := os.Getenv("CLAUDE_CLI_PATH")
@@ -157,8 +163,8 @@ func (d *RunTasksClaudeUseCase) executeClaude(ctx context.Context, task string) 
 
 // executeClaudeWithWorkingDir executes Claude CLI in a specific working directory
 func (d *RunTasksClaudeUseCase) executeClaudeWithWorkingDir(ctx context.Context, task, workingDir string) error {
-	// Claude CLI 명령어 구성
-	args := []string{task}
+	// Claude CLI 명령어 구성 (승인 요청 없이 실행)
+	args := []string{"--dangerously-skip-permissions", task}
 
 	// 환경변수에서 Claude CLI 경로 확인 (기본값: "claude")
 	claudeCmd := os.Getenv("CLAUDE_CLI_PATH")
@@ -250,8 +256,8 @@ func (d *RunTasksClaudeUseCase) ParseTasks(taskString string) []string {
 
 // executeClaudeAdvanced executes Claude CLI with advanced options from request
 func (d *RunTasksClaudeUseCase) executeClaudeAdvanced(ctx context.Context, req *request.ReqRunTasksClaude) error {
-	// Claude CLI 명령어 구성
-	args := []string{req.Tasks}
+	// Claude CLI 명령어 구성 (승인 요청 없이 실행)
+	args := []string{"--dangerously-skip-permissions", req.Tasks}
 
 	// 환경변수 또는 요청에서 Claude CLI 경로 확인
 	claudeCmd := req.ClaudeCmd
