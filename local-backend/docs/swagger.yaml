@@ -1,9 +1,80 @@
 basePath: /
 definitions:
+  request.RepositoryResult:
+    properties:
+      clone_url:
+        description: 복제 URL
+        type: string
+      error_message:
+        description: 에러 메시지 (실패시)
+        type: string
+      local_path:
+        description: 로컬 경로 (성공시)
+        type: string
+      name:
+        description: 저장소 이름
+        type: string
+      status:
+        description: 상태 (cloned/skipped/failed)
+        type: string
+    type: object
+  request.ReqCloneRepositories:
+    properties:
+      github_token:
+        description: GitHub 토큰 (옵션)
+        type: string
+      github_username:
+        description: 'GitHub 사용자명/조직명 (기본값: JokerTrickster)'
+        type: string
+      target_directory:
+        description: 대상 디렉토리 (옵션)
+        type: string
+    type: object
   request.ReqRunTasksClaude:
     properties:
-      tasks:
+      claude_cmd:
+        description: Claude CLI 명령어 경로 (옵션)
         type: string
+      continue_task:
+        description: 기존 작업 이어서 하기 (옵션)
+        type: boolean
+      interactive:
+        description: 대화형 모드 여부
+        type: boolean
+      repository_name:
+        description: 레포지토리 이름 (옵션)
+        type: string
+      tasks:
+        description: 실행할 작업 내용
+        type: string
+      working_dir:
+        description: 작업 디렉토리 (옵션)
+        type: string
+    required:
+    - tasks
+    type: object
+  request.ResCloneRepositories:
+    properties:
+      cloned_count:
+        description: 복제된 저장소 수
+        type: integer
+      details:
+        description: 개별 저장소 결과 상세
+        items:
+          $ref: '#/definitions/request.RepositoryResult'
+        type: array
+      failed_count:
+        description: 실패한 저장소 수
+        type: integer
+      skipped_count:
+        description: 건너뛴 저장소 수
+        type: integer
+      status:
+        description: 전체 작업 상태 (success/failed/partial)
+        type: string
+      total_repositories:
+        description: 전체 저장소 수
+        type: integer
     type: object
 host: localhost:8080
 info:
@@ -12,6 +83,79 @@ info:
   title: Local Backend API
   version: "1.0"
 paths:
+  /v0.1/claude/repositories/clone:
+    post:
+      description: |-
+        GitHub 사용자/조직의 모든 저장소를 로컬 디렉토리에 복제합니다.
+
+        **기능:**
+        - GitHub API를 통해 지정된 사용자/조직의 모든 저장소 목록을 가져옵니다
+        - 각 저장소를 지정된 로컬 디렉토리에 Git clone으로 복제합니다
+        - 이미 존재하는 저장소는 건너뛰어 중복 다운로드를 방지합니다
+        - 기본 사용자: JokerTrickster, 기본 경로: /Users/mac/project/git-repository/JokerTrickster
+
+        **요청 예시:**
+        ```json
+        {
+        "github_username": "JokerTrickster",
+        "github_token": "ghp_xxxxxxxxxxxx"
+        }
+        ```
+
+        **응답 예시:**
+        ```json
+        {
+        "status": "success",
+        "total_repositories": 15,
+        "cloned_count": 12,
+        "skipped_count": 3,
+        "failed_count": 0,
+        "details": [
+        {
+        "name": "workflow",
+        "clone_url": "https://github.com/JokerTrickster/workflow.git",
+        "status": "cloned",
+        "local_path": "/Users/mac/project/git-repository/JokerTrickster/workflow"
+        }
+        ]
+        }
+        ```
+
+        ■ **에러 코드 (HTTP 400)**
+        - PARAM_BAD : 파라미터 오류 또는 유효성 검증 실패
+        - GITHUB_USER_NOT_FOUND : GitHub 사용자/조직이 존재하지 않음
+        - GITHUB_USERNAME_INVALID : GitHub 사용자명 형식이 올바르지 않음
+        - GITHUB_API_RATE_LIMIT : GitHub API 호출 한도 초과
+        - GITHUB_API_AUTH_FAILED : GitHub API 인증 실패
+
+        ■ **에러 코드 (HTTP 500)**
+        - INTERNAL_SERVER : 내부 로직 처리 실패
+        - DIRECTORY_CREATE_FAILED : 대상 디렉토리 생성 실패
+        - GIT_CLONE_FAILED : Git 복제 작업 실패
+        - GITHUB_API_ERROR : GitHub API 서버 오류
+      parameters:
+      - description: 저장소 복제 요청
+        in: body
+        name: json
+        required: true
+        schema:
+          $ref: '#/definitions/request.ReqCloneRepositories'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 복제 작업 완료
+          schema:
+            $ref: '#/definitions/request.ResCloneRepositories'
+        "400":
+          description: 잘못된 요청
+          schema: {}
+        "500":
+          description: 서버 내부 오류
+          schema: {}
+      summary: GitHub 저장소 일괄 복제
+      tags:
+      - claude
   /v0.1/claude/tasks/run:
     post:
       description: |-
@@ -26,7 +170,7 @@ paths:
         INTERNAL_SERVER : 내부 로직 처리 실패
         INTERNAL_DB : DB 처리 실패
       parameters:
-      - description: 이메일, 비밀번호
+      - description: 'json body '
         in: body
         name: json
         required: true

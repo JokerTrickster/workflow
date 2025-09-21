@@ -9,3 +9,7 @@ import (
 type IRunTasksClaudeUseCase interface {
 	RunTasks(c context.Context, req *request.ReqRunTasksClaude) error
 }
+
+type ICloneRepositoriesUseCase interface {
+	CloneRepositories(c context.Context, req *request.ReqCloneRepositories) (*request.ResCloneRepositories, error)
+}

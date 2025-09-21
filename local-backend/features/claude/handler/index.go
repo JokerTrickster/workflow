@@ -11,4 +11,5 @@ import (
 
 func NewClaudeHandler(c *echo.Echo) {
 	NewRunTasksClaudeHandler(c, usecase.NewRunTasksClaudeUseCase(repository.NewRunTasksClaudeRepository(mysql.GormMysqlDB), mysql.DBTimeOut*time.Second))
+	NewCloneRepositoriesHandler(c, usecase.NewCloneRepositoriesUseCase(repository.NewCloneRepositoriesRepository(mysql.GormMysqlDB), mysql.DBTimeOut*time.Second))
 }

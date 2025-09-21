@@ -7,3 +7,7 @@ import (
 type RunTasksClaudeRepository struct {
 	GormDB *gorm.DB
 }
+
+type CloneRepositoriesRepository struct {
+	GormDB *gorm.DB
+}
