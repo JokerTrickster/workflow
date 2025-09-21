@@ -14,15 +14,15 @@ import (
 )
 
 type RunTasksClaudeUseCase struct {
-	Repository       _interface.IRunTasksClaudeRepository
-	ContextTimeout   time.Duration
+	Repository        _interface.IRunTasksClaudeRepository
+	ContextTimeout    time.Duration
 	RepositoryManager *utils.RepositoryManager
 }
 
 func NewRunTasksClaudeUseCase(repo _interface.IRunTasksClaudeRepository, timeout time.Duration) _interface.IRunTasksClaudeUseCase {
 	return &RunTasksClaudeUseCase{
-		Repository:       repo,
-		ContextTimeout:   timeout,
+		Repository:        repo,
+		ContextTimeout:    timeout,
 		RepositoryManager: utils.NewRepositoryManager(""),
 	}
 }
@@ -44,8 +44,8 @@ func (d *RunTasksClaudeUseCase) RunTasks(c context.Context, req *request.ReqRunT
 	var repo *utils.RepositoryInfo
 	var taskFilePath string
 
-	// 고정된 경로로 레포지토리 경로 설정
-	repoPath := fmt.Sprintf("/Users/mac/project/git-repository/%s", req.RepositoryName)
+	// 고정된 경로로 레포지토리 경로 설정 (JokerTrickster 하위)
+	repoPath := fmt.Sprintf("/Users/mac/project/git-repository/JokerTrickster/%s", req.RepositoryName)
 
 	// 레포지토리 디렉토리 존재 확인
 	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
@@ -62,8 +62,8 @@ func (d *RunTasksClaudeUseCase) RunTasks(c context.Context, req *request.ReqRunT
 
 	// 간단한 RepositoryInfo 구조체 생성 (로깅용)
 	repo = &utils.RepositoryInfo{
-		Name: req.RepositoryName,
-		Path: repoPath,
+		Name:      req.RepositoryName,
+		Path:      repoPath,
 		IsGitRepo: true,
 	}
 
