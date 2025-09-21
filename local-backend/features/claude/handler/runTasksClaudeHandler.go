@@ -36,7 +36,7 @@ func NewRunTasksClaudeHandler(c *echo.Echo, useCase _interface.IRunTasksClaudeUs
 // @Description ■ errCode with 500
 // @Description INTERNAL_SERVER : 내부 로직 처리 실패
 // @Description INTERNAL_DB : DB 처리 실패
-// @Param json body request.ReqRunTasksClaude true "이메일, 비밀번호"
+// @Param json body request.ReqRunTasksClaude true "json body "
 // @Produce json
 // @Success 200 {object} bool
 // @Failure 400 {object} error
