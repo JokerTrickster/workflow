@@ -79,3 +79,4 @@ Using the test-runner agent ensures:
 - NO MIXED CONCERNS - Don't put validation logic inside API handlers, database queries inside UI components, etc. instead of proper separation
 - NO RESOURCE LEAKS - Don't forget to close database connections, clear timeouts, remove event listeners, or clean up file handles
 - ALWAYS COMMIT AND PUSH - After completing any implementation work, always commit changes and push to GitHub
+- ALWAYS LOG TASKS - Every task execution must be logged to .claude/tasks folder with detailed context, status, and results for continuity and web display
