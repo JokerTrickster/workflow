@@ -5,6 +5,7 @@ created: 2025-09-15T02:37:00Z
 progress: 0%
 prd: .claude/prds/local-backend-server.md
 github: https://github.com/JokerTrickster/workflow/issues/52
+last_sync: "2025-09-22T15:14:40Z"
 ---
 
 # Epic: Local Backend Server
