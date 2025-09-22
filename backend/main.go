@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	
+
 	"local-backend-server/internal/infrastructure/config"
 	"local-backend-server/internal/handlers"
 	"local-backend-server/internal/infrastructure/database"
@@ -23,6 +23,7 @@ import (
 var queuePublisher *queue.Publisher
 var dbConnection *database.DB
 var atomicService *services.AtomicQueueService
+var taskHistoryHandler *handlers.TaskHistoryHandler
 
 func main() {
 	// Load environment variables
@@ -70,8 +71,12 @@ func main() {
 		}
 		atomicService = services.NewAtomicQueueService(dbConnection.DB, publisher)
 		log.Println("Atomic queue service initialized successfully")
+
+		// Initialize task history handler
+		taskHistoryHandler = handlers.NewTaskHistoryHandler(dbConnection.DB)
+		log.Println("Task history handler initialized successfully")
 	} else {
-		log.Println("Database not available, atomic service not initialized")
+		log.Println("Database not available, atomic service and task history handler not initialized")
 	}
 
 	// Initialize Gin router
@@ -127,6 +132,11 @@ func main() {
 			tasks.PUT("/:id", handleUpdateTask)
 			tasks.DELETE("/:id", handleDeleteTask)
 			tasks.POST("/:id/execute", handleExecuteTask)
+
+			// Task history endpoint - only if handler is available
+			if taskHistoryHandler != nil {
+				tasks.GET("/history/:repository_name", taskHistoryHandler.GetTaskHistory)
+			}
 		}
 
 		// AI routes
