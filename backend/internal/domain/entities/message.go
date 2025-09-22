@@ -11,6 +11,7 @@ const (
 	MessageTypeWorkRequest MessageType = "work_request"
 	MessageTypeCancel      MessageType = "cancel"
 	MessageTypeStatus      MessageType = "status"
+	MessageTypeClaudeTask  MessageType = "claude_task"
 )
 
 // MessageRole represents the role of the message sender

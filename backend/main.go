@@ -1,18 +1,48 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	
+	"local-backend-server/internal/infrastructure/config"
+	"local-backend-server/internal/infrastructure/queue"
 )
+
+// Global variables for dependencies
+var queuePublisher *queue.Publisher
 
 func main() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
+	}
+
+	// Load configuration
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Printf("Failed to load config: %v", err)
+		// Continue with default settings
+		cfg = getDefaultConfig()
+	}
+
+	// Initialize queue publisher
+	if cfg.RabbitMQ.URL != "" {
+		publisher, err := queue.NewPublisher(&cfg.RabbitMQ)
+		if err != nil {
+			log.Printf("Failed to create queue publisher: %v", err)
+			log.Println("Continuing without queue integration")
+		} else {
+			queuePublisher = publisher
+			log.Println("Queue publisher initialized successfully")
+		}
+	} else {
+		log.Println("No RabbitMQ URL configured, continuing without queue integration")
 	}
 
 	// Initialize Gin router
@@ -76,6 +106,13 @@ func main() {
 		{
 			ai.POST("/process", handleAIProcess)
 			ai.GET("/tokens/status", handleTokenStatus)
+		}
+
+		// Claude routes
+		claude := api.Group("/claude")
+		claude.Use(authMiddleware())
+		{
+			claude.POST("/run-tasks", handleClaudeRunTasks)
 		}
 
 		// Notification routes
@@ -156,6 +193,93 @@ func handleSubscribeNotifications(c *gin.Context) {
 
 func handleSendNotification(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Send notification endpoint"})
+}
+
+// Claude task execution structures
+type ReqRunTasksClaude struct {
+	Tasks          string `json:"tasks" binding:"required"`           // 실행할 작업 내용
+	RepositoryName string `json:"repository_name" binding:"required"` // 레포지토리 이름 (필수)
+	WorkingDir     string `json:"working_dir,omitempty"`              // 작업 디렉토리 (옵션)
+	Interactive    bool   `json:"interactive,omitempty"`              // 대화형 모드: 여러 작업을 순차 실행
+	ClaudeCmd      string `json:"claude_cmd,omitempty"`               // Claude CLI 명령어 경로 (옵션)
+	ContinueTask   bool   `json:"continue_task,omitempty"`            // 기존 작업 이어서 하기 (옵션)
+}
+
+type ClaudeTaskResponse struct {
+	RequestID string `json:"request_id"`
+	Status    string `json:"status"`
+	Message   string `json:"message"`
+	CreatedAt string `json:"created_at"`
+}
+
+func handleClaudeRunTasks(c *gin.Context) {
+	var req ReqRunTasksClaude
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: " + err.Error()})
+		return
+	}
+
+	// Generate request ID
+	requestID := fmt.Sprintf("req-%d", time.Now().Unix())
+	sessionID := fmt.Sprintf("session-%d", time.Now().Unix())
+
+	// Publish to queue if available
+	if queuePublisher != nil {
+		// Create workflow message for queue
+		workflowMessage := &queue.WorkflowMessage{
+			Type:      "claude_task",
+			ID:        requestID,
+			SessionID: sessionID,
+			Payload: map[string]interface{}{
+				"request_type": "claude_task",
+				"input": map[string]interface{}{
+					"tasks":           req.Tasks,
+					"repository_name": req.RepositoryName,
+					"working_dir":     req.WorkingDir,
+					"interactive":     req.Interactive,
+					"claude_cmd":      req.ClaudeCmd,
+					"continue_task":   req.ContinueTask,
+				},
+			},
+			Timestamp: time.Now(),
+		}
+
+		// Publish message to queue
+		if err := queuePublisher.PublishMessage(workflowMessage); err != nil {
+			log.Printf("Failed to publish message to queue: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to queue task: " + err.Error()})
+			return
+		}
+
+		log.Printf("Claude task published to queue: %s - %s", req.RepositoryName, req.Tasks)
+	} else {
+		log.Printf("Claude task logged (no queue): %s - %s", req.RepositoryName, req.Tasks)
+	}
+
+	response := ClaudeTaskResponse{
+		RequestID: requestID,
+		Status:    "pending",
+		Message:   "Claude task has been queued for processing",
+		CreatedAt: time.Now().Format(time.RFC3339),
+	}
+
+	c.JSON(http.StatusAccepted, response)
+}
+
+// getDefaultConfig returns default configuration for RabbitMQ
+func getDefaultConfig() *config.Config {
+	return &config.Config{
+		RabbitMQ: config.RabbitMQConfig{
+			URL:            os.Getenv("RABBITMQ_URL"),
+			QueueName:      os.Getenv("RABBITMQ_QUEUE_NAME"),
+			MaxRetries:     3,
+			RetryDelay:     time.Second * 5,
+			ReconnectDelay: time.Second * 10,
+			PrefetchCount:  1,
+			Durable:        true,
+			AutoDelete:     false,
+		},
+	}
 }
 
 // Auth middleware placeholder

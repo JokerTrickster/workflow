@@ -24,6 +24,7 @@ const (
 	RequestTypeIssueAnalysis RequestType = "issue_analysis"
 	RequestTypeBugFix        RequestType = "bug_fix"
 	RequestTypeFeature       RequestType = "feature"
+	RequestTypeClaudeTask    RequestType = "claude_task"
 )
 
 // Request represents a workflow request entity

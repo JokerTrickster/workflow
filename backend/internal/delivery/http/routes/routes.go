@@ -14,6 +14,7 @@ func SetupRoutes(e *echo.Echo) {
 	healthHandler := handlers.NewHealthHandler()
 	taskHandler := handlers.NewTaskHandler()
 	repositoryHandler := handlers.NewRepositoryHandler()
+	claudeHandler := handlers.NewClaudeHandler()
 
 	// API versioning group
 	v1 := e.Group("/api/v1")
@@ -79,5 +80,11 @@ func SetupRoutes(e *echo.Echo) {
 				"status":  "OK",
 			})
 		})
+	}
+
+	// Claude endpoints
+	claudeGroup := v1.Group("/claude")
+	{
+		claudeGroup.POST("/run-tasks", claudeHandler.RunTasks)
 	}
 }

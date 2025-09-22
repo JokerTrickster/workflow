@@ -242,6 +242,8 @@ func (wo *WorkflowOrchestrator) executeWorkflowWithRetry(ctx context.Context, re
 		return wo.executeBugFix(ctx, request, processingContext)
 	case entities.RequestTypeFeature:
 		return wo.executeFeatureImplementation(ctx, request, processingContext)
+	case entities.RequestTypeClaudeTask:
+		return wo.executeClaudeTask(ctx, request, processingContext)
 	default:
 		return nil, fmt.Errorf("unsupported request type: %s", request.Type)
 	}
@@ -283,6 +285,8 @@ func (wo *WorkflowOrchestrator) getSystemPromptForRequestType(requestType entiti
 		return "You are a debugging expert. Analyze bugs systematically and provide robust, well-tested solutions."
 	case entities.RequestTypeFeature:
 		return "You are a software architect. Design scalable, maintainable solutions following best practices."
+	case entities.RequestTypeClaudeTask:
+		return "You are Claude Code, an AI assistant helping with general task execution and workflow automation."
 	default:
 		return "You are an AI assistant helping with software development tasks. Provide helpful, accurate, and actionable responses."
 	}
@@ -546,5 +550,93 @@ func (wo *WorkflowOrchestrator) executeFeatureImplementation(ctx context.Context
 		"result": response.Content,
 		"token_usage": response.TokenUsage,
 		"system_prompt": systemPrompt,
+	}, nil
+}
+
+// executeClaudeTask executes general Claude task workflow
+func (wo *WorkflowOrchestrator) executeClaudeTask(ctx context.Context, request *entities.Request, processingContext *entities.ProcessingContext) (map[string]interface{}, error) {
+	log.Printf("Executing Claude task for request: %s", request.ID)
+
+	// Extract task details from input
+	tasks, ok := request.Input["tasks"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid or missing tasks in request input")
+	}
+
+	repositoryName, ok := request.Input["repository_name"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid or missing repository_name in request input")
+	}
+
+	// Optional fields
+	workingDir := ""
+	if wd, ok := request.Input["working_dir"].(string); ok {
+		workingDir = wd
+	}
+
+	interactive := false
+	if inter, ok := request.Input["interactive"].(bool); ok {
+		interactive = inter
+	}
+
+	claudeCmd := ""
+	if cmd, ok := request.Input["claude_cmd"].(string); ok {
+		claudeCmd = cmd
+	}
+
+	continueTask := false
+	if cont, ok := request.Input["continue_task"].(bool); ok {
+		continueTask = cont
+	}
+
+	// Prepare context for Claude
+	userPrompt := fmt.Sprintf(`Execute the following tasks in repository "%s":
+
+Tasks: %s
+
+Repository: %s
+Working Directory: %s
+Interactive Mode: %t
+Claude Command: %s
+Continue Task: %t
+
+Please execute these tasks and provide a comprehensive response about the actions taken and results achieved.`, 
+		repositoryName, tasks, repositoryName, workingDir, interactive, claudeCmd, continueTask)
+
+	// Process with context manager
+	response, err := wo.contextManager.ProcessWithContext(ctx, processingContext, userPrompt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to process Claude task with context: %w", err)
+	}
+
+	// Create result message
+	resultMessage := entities.NewMessage(
+		request.SessionID,
+		entities.MessageTypeClaudeTask,
+		entities.MessageRoleAssistant,
+		response.Content,
+	)
+
+	// Save result message
+	if err := wo.messageRepo.Create(ctx, resultMessage); err != nil {
+		log.Printf("Warning: failed to save Claude task result message: %v", err)
+	}
+
+	// Update context with response
+	if err := wo.contextManager.AddMessage(ctx, processingContext, resultMessage); err != nil {
+		log.Printf("Warning: failed to add message to context: %v", err)
+	}
+
+	return map[string]interface{}{
+		"type": "claude_task",
+		"result": response.Content,
+		"token_usage": response.TokenUsage,
+		"message_id": resultMessage.ID,
+		"tasks": tasks,
+		"repository_name": repositoryName,
+		"working_dir": workingDir,
+		"interactive": interactive,
+		"claude_cmd": claudeCmd,
+		"continue_task": continueTask,
 	}, nil
 }
