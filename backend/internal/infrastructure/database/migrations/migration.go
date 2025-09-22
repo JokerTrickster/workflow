@@ -194,11 +194,13 @@ func migration001Up(db *gorm.DB) error {
 		&models.Message{},
 		&models.Request{},
 		&models.ProcessingContext{},
+		&models.WorkflowHistory{},
 	)
 }
 
 func migration001Down(db *gorm.DB) error {
 	return db.Migrator().DropTable(
+		&models.WorkflowHistory{},
 		&models.ProcessingContext{},
 		&models.Request{},
 		&models.Message{},
@@ -225,6 +227,19 @@ func migration002Up(db *gorm.DB) error {
 		return err
 	}
 	
+	// Add workflow_histories indexes
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_workflow_histories_request_id ON workflow_histories(request_id)").Error; err != nil {
+		return err
+	}
+	
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_workflow_histories_status_created ON workflow_histories(status, created_at)").Error; err != nil {
+		return err
+	}
+	
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_workflow_histories_repository ON workflow_histories(repository_name, created_at)").Error; err != nil {
+		return err
+	}
+	
 	return nil
 }
 
@@ -234,6 +249,9 @@ func migration002Down(db *gorm.DB) error {
 	db.Exec("DROP INDEX IF EXISTS idx_messages_session_created")
 	db.Exec("DROP INDEX IF EXISTS idx_requests_status_created")
 	db.Exec("DROP INDEX IF EXISTS idx_requests_session_type")
+	db.Exec("DROP INDEX IF EXISTS idx_workflow_histories_request_id")
+	db.Exec("DROP INDEX IF EXISTS idx_workflow_histories_status_created")
+	db.Exec("DROP INDEX IF EXISTS idx_workflow_histories_repository")
 	
 	return nil
 }

@@ -11,11 +11,16 @@ import (
 	"github.com/joho/godotenv"
 	
 	"local-backend-server/internal/infrastructure/config"
+	"local-backend-server/internal/infrastructure/database"
 	"local-backend-server/internal/infrastructure/queue"
+	"local-backend-server/internal/interfaces"
+	"local-backend-server/internal/services"
 )
 
 // Global variables for dependencies
 var queuePublisher *queue.Publisher
+var dbConnection *database.DB
+var atomicService *services.AtomicQueueService
 
 func main() {
 	// Load environment variables
@@ -31,6 +36,16 @@ func main() {
 		cfg = getDefaultConfig()
 	}
 
+	// Initialize database connection
+	dbConn, err := database.NewConnection(cfg)
+	if err != nil {
+		log.Printf("Failed to create database connection: %v", err)
+		log.Println("Continuing without database integration")
+	} else {
+		dbConnection = dbConn
+		log.Println("Database connection initialized successfully")
+	}
+
 	// Initialize queue publisher
 	if cfg.RabbitMQ.URL != "" {
 		publisher, err := queue.NewPublisher(&cfg.RabbitMQ)
@@ -43,6 +58,18 @@ func main() {
 		}
 	} else {
 		log.Println("No RabbitMQ URL configured, continuing without queue integration")
+	}
+
+	// Initialize atomic service if both database and queue are available
+	if dbConnection != nil {
+		var publisher interfaces.MessagePublisher
+		if queuePublisher != nil {
+			publisher = queuePublisher
+		}
+		atomicService = services.NewAtomicQueueService(dbConnection.DB, publisher)
+		log.Println("Atomic queue service initialized successfully")
+	} else {
+		log.Println("Database not available, atomic service not initialized")
 	}
 
 	// Initialize Gin router
@@ -219,7 +246,60 @@ func handleClaudeRunTasks(c *gin.Context) {
 		return
 	}
 
-	// Generate request ID
+	// Use atomic service if available, otherwise fall back to old behavior
+	if atomicService != nil {
+		// Generate session ID
+		sessionID := fmt.Sprintf("session-%d", time.Now().Unix())
+
+		// Create atomic publish request
+		publishRequest := services.PublishRequest{
+			Tasks:          req.Tasks,
+			RepositoryName: req.RepositoryName,
+			WorkingDir:     req.WorkingDir,
+			Interactive:    req.Interactive,
+			ClaudeCmd:      req.ClaudeCmd,
+			ContinueTask:   req.ContinueTask,
+			MessageType:    "claude_task",
+			SessionID:      sessionID,
+			Payload: map[string]interface{}{
+				"request_type": "claude_task",
+				"input": map[string]interface{}{
+					"tasks":           req.Tasks,
+					"repository_name": req.RepositoryName,
+					"working_dir":     req.WorkingDir,
+					"interactive":     req.Interactive,
+					"claude_cmd":      req.ClaudeCmd,
+					"continue_task":   req.ContinueTask,
+				},
+			},
+		}
+
+		// Execute atomic operation
+		response, err := atomicService.PublishWithHistory(c.Request.Context(), publishRequest)
+		if err != nil {
+			log.Printf("Failed to execute atomic operation: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to queue task: " + err.Error()})
+			return
+		}
+
+		log.Printf("Claude task published atomically: %s - %s (ID: %s)", req.RepositoryName, req.Tasks, response.RequestID)
+
+		// Convert response format
+		claudeResponse := ClaudeTaskResponse{
+			RequestID: response.RequestID,
+			Status:    response.Status,
+			Message:   response.Message,
+			CreatedAt: response.CreatedAt.Format(time.RFC3339),
+		}
+
+		c.JSON(http.StatusAccepted, claudeResponse)
+		return
+	}
+
+	// Fallback to original implementation for backward compatibility
+	log.Println("Atomic service not available, falling back to simple queue publishing")
+
+	// Generate request ID (old timestamp format for compatibility)
 	requestID := fmt.Sprintf("req-%d", time.Now().Unix())
 	sessionID := fmt.Sprintf("session-%d", time.Now().Unix())
 
@@ -266,7 +346,7 @@ func handleClaudeRunTasks(c *gin.Context) {
 	c.JSON(http.StatusAccepted, response)
 }
 
-// getDefaultConfig returns default configuration for RabbitMQ
+// getDefaultConfig returns default configuration
 func getDefaultConfig() *config.Config {
 	return &config.Config{
 		RabbitMQ: config.RabbitMQConfig{
@@ -278,6 +358,13 @@ func getDefaultConfig() *config.Config {
 			PrefetchCount:  1,
 			Durable:        true,
 			AutoDelete:     false,
+		},
+		Database: config.DatabaseConfig{
+			Path:           "./data/workflow.db",
+			MaxConnections: 10,
+		},
+		Logging: config.LoggingConfig{
+			Level: "info",
 		},
 	}
 }

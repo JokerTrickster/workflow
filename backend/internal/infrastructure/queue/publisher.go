@@ -76,3 +76,12 @@ func (p *Publisher) Close() error {
 	}
 	return nil
 }
+
+// PublishError represents a queue publishing error
+type PublishError struct {
+	Message string
+}
+
+func (e *PublishError) Error() string {
+	return e.Message
+}
