@@ -1,68 +1,74 @@
 # Deployment Guide
 
-## Overview
+이 프로젝트는 GitHub Actions를 사용한 다중 환경 배포를 지원합니다.
 
-This guide covers deployment procedures for the workflow management application, including environment setup, build processes, and production deployment strategies.
+## 🚀 배포 방법
 
-## Architecture
+### GitHub Actions를 통한 배포
 
-### Frontend (Next.js)
-- **Framework**: Next.js 15 with React 19
-- **Deployment**: Static export or Server-Side Rendering
-- **CDN**: Optimized for global content delivery
-- **PWA**: Progressive Web App capabilities
+1. GitHub 저장소의 `Actions` 탭으로 이동
+2. `Multi-Environment Deployment` 워크플로우 선택
+3. `Run workflow` 버튼 클릭
+4. 다음 옵션 선택:
+   - **Branch**: 배포할 브랜치 (예: `main`, `develop`)
+   - **Folder**: 배포할 컴포넌트
+     - `backend`: 메인 백엔드 서버
+     - `frontend`: React 프론트엔드
+     - `local-backend`: 로컬 백엔드 서버
+   - **Environment**: 배포 환경
+     - `local`: Git 태그만 생성 (로컬 개발용)
+     - `cloud`: 실제 클라우드 환경에 배포
 
-### Backend (Go)
-- **Framework**: Go with Gin/Echo (if implemented)
-- **Database**: PostgreSQL with connection pooling
-- **Cache**: Redis for session management
-- **API**: RESTful API with JWT authentication
+## 📋 배포 환경별 설정
 
-## Environment Setup
+### Local 환경
+- Git 태그만 생성됩니다
+- 실제 서버 배포는 수행되지 않습니다
+- 개발 및 테스트 목적으로 사용
 
-### Required Environment Variables
+### Cloud 환경
 
-#### Frontend (.env.local)
-```bash
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+#### Frontend (S3 + CloudFront)
+- React 애플리케이션을 빌드하여 S3에 정적 호스팅
+- CloudFront CDN을 통한 글로벌 배포 (선택사항)
 
-# Application Configuration
-NEXT_PUBLIC_APP_ENV=production
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+#### Backend/Local-Backend (EC2)
+- Go 애플리케이션을 빌드하여 EC2 인스턴스에 배포
+- systemd 서비스로 관리
+- 무중단 배포 지원 (백업 및 롤백)
 
-# Analytics (optional)
-NEXT_PUBLIC_GA_ID=your_google_analytics_id
+## 🔧 필수 GitHub Secrets 설정
+
+GitHub 저장소의 `Settings` > `Secrets and variables` > `Actions`에서 다음 시크릿을 설정해야 합니다:
+
+### AWS 관련 (Frontend 배포용)
+```
+AWS_ACCESS_KEY_ID: AWS 액세스 키 ID
+AWS_SECRET_ACCESS_KEY: AWS 시크릿 액세스 키
+AWS_REGION: AWS 리전 (예: ap-northeast-2)
+S3_BUCKET: S3 버킷 이름
+CLOUDFRONT_DISTRIBUTION_ID: CloudFront 배포 ID (선택사항)
 ```
 
-#### Backend (.env)
-```bash
-# Database
-DATABASE_URL=postgresql://user:password@host:port/database
-REDIS_URL=redis://host:port
-
-# Authentication
-JWT_SECRET=your_jwt_secret
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
-
-# Application
-PORT=8080
-APP_ENV=production
+### EC2 관련 (Backend 배포용)
+```
+EC2_HOST: EC2 인스턴스 IP 또는 도메인
+EC2_USER: EC2 사용자명 (일반적으로 ubuntu)
+EC2_SSH_KEY: EC2 접속용 SSH 개인키 (-----BEGIN RSA PRIVATE KEY----- 포함)
 ```
 
-### Security Configuration
-```bash
-# Security Headers
-CSP_ENABLED=true
-HTTPS_REDIRECT=true
-CORS_ORIGINS=https://yourdomain.com
+## 🛠️ EC2 서버 초기 설정
 
-# Rate Limiting
-RATE_LIMIT_ENABLED=true
-RATE_LIMIT_REQUESTS=100
-RATE_LIMIT_WINDOW=900
+EC2 인스턴스에서 다음 명령으로 서비스를 설정합니다:
+
+```bash
+# 저장소 클론
+git clone https://github.com/JokerTrickster/workflow.git
+cd workflow
+
+# 서비스 설정 스크립트 실행
+chmod +x scripts/deployment/setup-ec2-services.sh
+./scripts/deployment/setup-ec2-services.sh
 ```
 
 ## Build Process
