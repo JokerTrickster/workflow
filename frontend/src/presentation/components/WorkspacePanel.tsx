@@ -6,10 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
-import { ExternalLink, Activity, BarChart3, AlertCircle, CheckCircle } from 'lucide-react';
+import { ExternalLink, Activity, BarChart3, AlertCircle, CheckCircle, History } from 'lucide-react';
 import { TaskTab } from './tabs/TaskTab';
 import { LogsTab } from './tabs/LogsTab';
 import { DashboardTab } from './tabs/DashboardTab';
+import { TaskHistory } from '../../components/TaskHistory';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 
 interface WorkspacePanelProps {
@@ -99,7 +100,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
 
     // Restore tab state for this repository
     const savedTab = localStorage.getItem(`workspace-tab-${repository.id}`);
-    if (savedTab && ['tasks', 'logs', 'dashboard'].includes(savedTab)) {
+    if (savedTab && ['tasks', 'history', 'logs', 'dashboard'].includes(savedTab)) {
       setActiveTab(savedTab);
     }
   }, [repository.id, repository.name]);
@@ -199,10 +200,14 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
       <div className="flex-1 overflow-hidden">
         <div className="container mx-auto max-w-7xl px-4 py-6 px-safe-4 h-full">
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full h-full flex flex-col">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="tasks" className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Tasks</span>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              <span className="hidden sm:inline">History</span>
             </TabsTrigger>
             <TabsTrigger value="logs" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
@@ -215,8 +220,8 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
           </TabsList>
 
           <TabsContent value="tasks" className="space-y-4 flex-1 overflow-y-auto min-h-0">
-            <ErrorBoundary 
-              level="component" 
+            <ErrorBoundary
+              level="component"
               showDetails={process.env.NODE_ENV === 'development'}
               onError={(error, errorInfo) => {
                 console.error('TaskTab Error:', error, errorInfo);
@@ -238,8 +243,8 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
                       <Button variant="outline" onClick={resetError}>
                         Try Again
                       </Button>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         onClick={() => window.location.reload()}
                       >
                         Refresh Page
@@ -258,6 +263,52 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
               )}
             >
               <TaskTab repository={repository} />
+            </ErrorBoundary>
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-4 flex-1 overflow-y-auto min-h-0">
+            <ErrorBoundary
+              level="component"
+              showDetails={process.env.NODE_ENV === 'development'}
+              onError={(error, errorInfo) => {
+                console.error('TaskHistory Error:', error, errorInfo);
+              }}
+              fallback={(error, resetError) => (
+                <Card className="border-red-200 bg-red-50">
+                  <CardHeader>
+                    <CardTitle className="text-red-900 flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5" />
+                      Task History Error
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-red-700 mb-4">
+                      The task history tab encountered an error and couldn&apos;t load properly.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={resetError}>
+                        Try Again
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => window.location.reload()}
+                      >
+                        Refresh Page
+                      </Button>
+                    </div>
+                    {process.env.NODE_ENV === 'development' && (
+                      <details className="mt-4 text-xs">
+                        <summary className="cursor-pointer font-medium">Technical Details</summary>
+                        <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
+                          {error.message}
+                        </pre>
+                      </details>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            >
+              <TaskHistory repository={repository} />
             </ErrorBoundary>
           </TabsContent>
 

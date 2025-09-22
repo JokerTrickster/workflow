@@ -31,6 +31,41 @@ export interface TaskStatus {
   completed_at?: string;
 }
 
+// Task history interfaces matching backend models
+export interface WorkflowHistory {
+  id: number;
+  request_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  tasks: string;
+  repository_name: string;
+  working_dir?: string;
+  claude_cmd?: string;
+  interactive: boolean;
+  continue_task: boolean;
+  created_at: string;
+  completed_at?: string;
+  processing_time_ms?: number;
+  result?: string;
+  error?: string;
+}
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+}
+
+export interface TaskHistoryResponse {
+  data: WorkflowHistory[];
+  pagination: PaginationMeta;
+}
+
+export interface TaskHistoryParams {
+  page?: number;
+  limit?: number;
+}
+
 /**
  * Claude service for handling task execution requests
  */
@@ -126,9 +161,33 @@ export class ClaudeService {
   ): Promise<TaskStatus> {
     // Submit the task
     const submitResponse = await this.runTasks(request);
-    
+
     // Poll for completion
     return this.pollTaskStatus(submitResponse.request_id, onProgress, pollInterval);
+  }
+
+  /**
+   * Get task history for a repository with pagination
+   */
+  async getTaskHistory(
+    repositoryName: string,
+    params: TaskHistoryParams = {}
+  ): Promise<TaskHistoryResponse> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.limit) queryParams.append('limit', params.limit.toString());
+
+      const endpoint = `/tasks/history/${encodeURIComponent(repositoryName)}${
+        queryParams.toString() ? '?' + queryParams.toString() : ''
+      }`;
+
+      const response = await apiClient.get<TaskHistoryResponse>(endpoint);
+      return response;
+    } catch (error) {
+      console.error('Failed to get task history:', error);
+      throw error;
+    }
   }
 }
 
