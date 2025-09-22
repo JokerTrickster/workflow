@@ -31,13 +31,19 @@ branch: epic/task-history-api
   - ✅ Database & queue error handling with retries
   - ✅ 91 test cases with 100% pass rate
 
+- **#74: Frontend API Integration** - Completed
+  - ✅ TaskHistory component suite with full functionality
+  - ✅ API client extension for task history endpoint
+  - ✅ Pagination, status indicators, and real-time polling
+  - ✅ Repository auto-filtering and error handling
+  - ✅ Mobile-responsive design with existing patterns
+
 ## Now Ready to Start 🚀
-- **#74: Frontend API Integration** - Ready (depends on #72 ✅)
+- **#75: Integration Testing** - Ready (depends on #72 ✅, #74 ✅)
 
 ## Still Blocked ⏸
-- #75: Integration Testing - Waiting for #72 ✅, #74
 - #76: Performance Optimization - Waiting for #75
 
-## Current Progress: 4/7 Tasks Complete (57%)
+## Current Progress: 5/7 Tasks Complete (71%)
 
-Next: Launch Task #74 to integrate the API with the frontend, which will unblock the final testing phase.
+Next: Launch Task #75 for end-to-end integration testing, then final performance optimization.
