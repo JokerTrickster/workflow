@@ -173,6 +173,12 @@ func GetAllMigrations() []*MigrationDefinition {
 			Up:          migration002Up,
 			Down:        migration002Down,
 		},
+		{
+			Version:     "003_optimize_workflow_indexes",
+			Description: "Optimize workflow_histories indexes for task history API performance",
+			Up:          migration003Up,
+			Down:        migration003Down,
+		},
 	}
 }
 
@@ -253,5 +259,47 @@ func migration002Down(db *gorm.DB) error {
 	db.Exec("DROP INDEX IF EXISTS idx_workflow_histories_status_created")
 	db.Exec("DROP INDEX IF EXISTS idx_workflow_histories_repository")
 	
+	return nil
+}
+
+// Migration 003: Optimize workflow_histories indexes for performance
+func migration003Up(db *gorm.DB) error {
+	// Drop existing indexes to avoid conflicts
+	db.Exec("DROP INDEX IF EXISTS idx_workflow_histories_repository")
+	db.Exec("DROP INDEX IF EXISTS idx_workflow_histories_status_created")
+	
+	// Create optimized compound index for repository filtering and date sorting
+	// This supports efficient queries like: WHERE repository_name = ? ORDER BY created_at DESC
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_workflow_histories_repo_date_desc ON workflow_histories(repository_name, created_at DESC)").Error; err != nil {
+		return fmt.Errorf("failed to create compound repository-date index: %w", err)
+	}
+	
+	// Create standalone status index for future filtering capabilities
+	// This supports efficient queries like: WHERE status = ?
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_workflow_histories_status ON workflow_histories(status)").Error; err != nil {
+		return fmt.Errorf("failed to create status index: %w", err)
+	}
+	
+	// Create compound status-date index for status filtering with date sorting
+	// This supports efficient queries like: WHERE status = ? ORDER BY created_at DESC
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_workflow_histories_status_date_desc ON workflow_histories(status, created_at DESC)").Error; err != nil {
+		return fmt.Errorf("failed to create status-date index: %w", err)
+	}
+	
+	log.Println("Optimized workflow_histories indexes created successfully")
+	return nil
+}
+
+func migration003Down(db *gorm.DB) error {
+	// Drop optimized indexes
+	db.Exec("DROP INDEX IF EXISTS idx_workflow_histories_repo_date_desc")
+	db.Exec("DROP INDEX IF EXISTS idx_workflow_histories_status")
+	db.Exec("DROP INDEX IF EXISTS idx_workflow_histories_status_date_desc")
+	
+	// Restore original indexes from migration002
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_workflow_histories_repository ON workflow_histories(repository_name, created_at)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_workflow_histories_status_created ON workflow_histories(status, created_at)")
+	
+	log.Println("Reverted to original workflow_histories indexes")
 	return nil
 }
