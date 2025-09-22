@@ -11,9 +11,11 @@ import (
 	"github.com/joho/godotenv"
 	
 	"local-backend-server/internal/infrastructure/config"
+	"local-backend-server/internal/handlers"
 	"local-backend-server/internal/infrastructure/database"
 	"local-backend-server/internal/infrastructure/queue"
 	"local-backend-server/internal/interfaces"
+	"local-backend-server/internal/middleware"
 	"local-backend-server/internal/services"
 )
 
@@ -73,7 +75,15 @@ func main() {
 	}
 
 	// Initialize Gin router
-	r := gin.Default()
+	r := gin.New()
+
+	// Add comprehensive middleware stack
+	r.Use(middleware.RequestIDMiddleware())
+	r.Use(middleware.ErrorHandlingMiddleware())
+	r.Use(middleware.ValidationErrorHandler())
+	r.Use(middleware.ErrorHandler())
+	r.Use(middleware.HealthCheckMiddleware())
+	r.Use(middleware.TimeoutMiddleware(60 * time.Second))
 
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
@@ -86,14 +96,6 @@ func main() {
 			return
 		}
 		c.Next()
-	})
-
-	// Health check endpoint
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
-			"message": "AI Git Workbench Backend is running",
-		})
 	})
 
 	// API routes group
@@ -148,6 +150,14 @@ func main() {
 		{
 			notifications.POST("/subscribe", handleSubscribeNotifications)
 			notifications.POST("/send", handleSendNotification)
+		}
+		
+		// Monitoring routes
+		monitoring := api.Group("/monitoring")
+		{
+			monitoring.GET("/health/detailed", handlers.HandleHealthDetailed)
+			monitoring.GET("/metrics/errors", handlers.HandleErrorMetrics)
+			monitoring.POST("/metrics/reset", handlers.HandleResetMetrics)
 		}
 	}
 
@@ -242,7 +252,7 @@ type ClaudeTaskResponse struct {
 func handleClaudeRunTasks(c *gin.Context) {
 	var req ReqRunTasksClaude
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: " + err.Error()})
+		// Error handling is now done by middleware
 		return
 	}
 
@@ -277,8 +287,8 @@ func handleClaudeRunTasks(c *gin.Context) {
 		// Execute atomic operation
 		response, err := atomicService.PublishWithHistory(c.Request.Context(), publishRequest)
 		if err != nil {
-			log.Printf("Failed to execute atomic operation: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to queue task: " + err.Error()})
+			// Use middleware error handling
+			middleware.HandleError(c, err, "Failed to execute atomic Claude task operation")
 			return
 		}
 
@@ -327,7 +337,7 @@ func handleClaudeRunTasks(c *gin.Context) {
 		// Publish message to queue
 		if err := queuePublisher.PublishMessage(workflowMessage); err != nil {
 			log.Printf("Failed to publish message to queue: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to queue task: " + err.Error()})
+			middleware.HandleError(c, err, "Failed to publish Claude task to queue (fallback mode)")
 			return
 		}
 
