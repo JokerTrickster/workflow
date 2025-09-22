@@ -80,3 +80,48 @@ Using the test-runner agent ensures:
 - NO RESOURCE LEAKS - Don't forget to close database connections, clear timeouts, remove event listeners, or clean up file handles
 - ALWAYS COMMIT AND PUSH - After completing any implementation work, always commit changes and push to GitHub
 - ALWAYS LOG TASKS - Every task execution must be logged to .claude/tasks folder with detailed context, status, and results for continuity and web display
+
+## Workflow History System
+
+### Database Flow
+The project implements a workflow history system that tracks Claude task executions from frontend to local-backend:
+
+**1. Frontend → Backend → RabbitMQ**
+- User submits task via `ClaudeTaskRunner` component
+- Backend receives request and publishes to RabbitMQ queue
+- Backend returns `request_id` to frontend for tracking
+
+**2. Local-backend → Database**
+- Local-backend consumes RabbitMQ messages
+- Creates `workflow_histories` record with status 'pending'
+- Updates status to 'processing' when task starts
+- Updates status to 'completed'/'failed' with results when task finishes
+
+**3. Database Schema (Simplified)**
+```sql
+workflow_histories:
+- request_id (unique identifier for frontend)
+- status (pending → processing → completed/failed)
+- tasks, repository_name, working_dir, claude_cmd
+- interactive, continue_task (frontend input values)
+- created_at, completed_at, processing_time_ms
+- result (JSON), error (text)
+```
+
+**4. GORM Model**
+```go
+type WorkflowHistories struct {
+    RequestID        string    `json:"request_id"`
+    Status           string    `json:"status"`
+    Tasks            string    `json:"tasks"`
+    RepositoryName   string    `json:"repository_name"`
+    // ... (matches frontend display data exactly)
+}
+```
+
+**5. Implementation Flow**
+- RabbitMQ message received → Create DB record (status: pending)
+- Task execution starts → Update status to 'processing'
+- Task completes → Update completed_at, processing_time_ms, result/error, status
+
+This system provides full traceability of task executions while keeping the database schema simple and focused on frontend display requirements.

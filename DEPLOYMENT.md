@@ -6,34 +6,35 @@
 
 ### GitHub Actions를 통한 배포
 
-1. GitHub 저장소의 `Actions` 탭으로 이동
-2. `Multi-Environment Deployment` 워크플로우 선택
-3. `Run workflow` 버튼 클릭
-4. 다음 옵션 선택:
+GitHub 저장소의 `Actions` 탭에서 다음 워크플로우 중 선택:
+
+#### 1. Frontend 배포 (`Deploy Frontend`)
+1. `Actions` > `Deploy Frontend` 선택
+2. `Run workflow` 클릭
+3. 옵션 설정:
    - **Branch**: 배포할 브랜치 (예: `main`, `develop`)
-   - **Folder**: 배포할 컴포넌트
-     - `backend`: 메인 백엔드 서버
-     - `frontend`: React 프론트엔드
-     - `local-backend`: 로컬 백엔드 서버
-   - **Environment**: 배포 환경
-     - `local`: Git 태그만 생성 (로컬 개발용)
-     - `cloud`: 실제 클라우드 환경에 배포
+   - **Environment**: `local` 또는 `cloud`
+
+#### 2. Backend 배포 (`Deploy Backend`)
+1. `Actions` > `Deploy Backend` 선택  
+2. `Run workflow` 클릭
+3. 옵션 설정:
+   - **Branch**: 배포할 브랜치
+   - **Component**: `backend` 또는 `local-backend`
+   - **Environment**: `local` 또는 `cloud`
 
 ## 📋 배포 환경별 설정
 
-### Local 환경
-- Git 태그만 생성됩니다
-- 실제 서버 배포는 수행되지 않습니다
-- 개발 및 테스트 목적으로 사용
-
-### Cloud 환경
-
-#### Frontend (S3 + CloudFront)
+### Frontend 배포 (S3 + CloudFront)
+- **Local**: `jokertrickster-workflow-local` S3 버킷
+- **Cloud**: `jokertrickster-workflow` S3 버킷
 - React 애플리케이션을 빌드하여 S3에 정적 호스팅
-- CloudFront CDN을 통한 글로벌 배포 (선택사항)
+- CloudFront CDN 캐시 무효화 자동 실행
 
-#### Backend/Local-Backend (EC2)
-- Go 애플리케이션을 빌드하여 EC2 인스턴스에 배포
+### Backend 배포 (EC2)
+- **Local**: local EC2 인스턴스
+- **Cloud**: cloud EC2 인스턴스
+- Go 애플리케이션을 빌드하여 EC2에 배포
 - systemd 서비스로 관리
 - 무중단 배포 지원 (백업 및 롤백)
 
@@ -46,14 +47,26 @@ GitHub 저장소의 `Settings` > `Secrets and variables` > `Actions`에서 다�
 AWS_ACCESS_KEY_ID: AWS 액세스 키 ID
 AWS_SECRET_ACCESS_KEY: AWS 시크릿 액세스 키
 AWS_REGION: AWS 리전 (예: ap-northeast-2)
-S3_BUCKET: S3 버킷 이름
 CLOUDFRONT_DISTRIBUTION_ID: CloudFront 배포 ID (선택사항)
+```
+
+### Frontend API URL 설정
+```
+LOCAL_API_URL: Local 환경 API URL
+CLOUD_API_URL: Cloud 환경 API URL
 ```
 
 ### EC2 관련 (Backend 배포용)
 ```
-EC2_HOST: EC2 인스턴스 IP 또는 도메인
-EC2_USER: EC2 사용자명 (일반적으로 ubuntu)
+# Local 환경
+EC2_LOCAL_HOST: Local EC2 인스턴스 IP 또는 도메인
+EC2_LOCAL_USER: Local EC2 사용자명 (일반적으로 ubuntu)
+
+# Cloud 환경
+EC2_CLOUD_HOST: Cloud EC2 인스턴스 IP 또는 도메인
+EC2_CLOUD_USER: Cloud EC2 사용자명 (일반적으로 ubuntu)
+
+# SSH 키 (공통)
 EC2_SSH_KEY: EC2 접속용 SSH 개인키 (-----BEGIN RSA PRIVATE KEY----- 포함)
 ```
 

@@ -1,0 +1,144 @@
+name: Deploy Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+        type: string
+      component:
+        description: 'Backend component to deploy'
+        required: true
+        type: choice
+        options:
+          - backend
+          - local-backend
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - local
+          - cloud
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+      
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+      
+      - name: Build application
+        run: |
+          if [ "${{ github.event.inputs.component }}" == "backend" ]; then
+            cd backend
+            go mod download
+            go build -o server main.go
+            echo "Built backend server"
+          else
+            cd local-backend
+            go mod download
+            go build -o local-server cmd/server/main.go
+            echo "Built local-backend server"
+          fi
+      
+      - name: Set deployment target
+        id: target
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "cloud" ]; then
+            echo "host=${{ secrets.EC2_CLOUD_HOST }}" >> $GITHUB_OUTPUT
+            echo "user=${{ secrets.EC2_CLOUD_USER }}" >> $GITHUB_OUTPUT
+          else
+            echo "host=${{ secrets.EC2_LOCAL_HOST }}" >> $GITHUB_OUTPUT
+            echo "user=${{ secrets.EC2_LOCAL_USER }}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ steps.target.outputs.host }}
+          EC2_USER: ${{ steps.target.outputs.user }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$EC2_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+          
+          # Determine binary and service names
+          if [ "${{ github.event.inputs.component }}" == "backend" ]; then
+            BINARY_NAME="server"
+            SERVICE_NAME="workflow-backend"
+            LOCAL_PATH="backend/server"
+          else
+            BINARY_NAME="local-server"
+            SERVICE_NAME="workflow-local-backend"
+            LOCAL_PATH="local-backend/local-server"
+          fi
+          
+          echo "Deploying ${{ github.event.inputs.component }} to $EC2_HOST"
+          
+          # Copy binary to EC2
+          scp -i ~/.ssh/id_rsa $LOCAL_PATH $EC2_USER@$EC2_HOST:/tmp/$BINARY_NAME
+          
+          # Deploy on EC2
+          ssh -i ~/.ssh/id_rsa $EC2_USER@$EC2_HOST << EOF
+            # Stop existing service
+            sudo systemctl stop $SERVICE_NAME || true
+            
+            # Backup current binary
+            sudo cp /opt/workflow/$BINARY_NAME /opt/workflow/${BINARY_NAME}.backup.\$(date +%Y%m%d-%H%M%S) || true
+            
+            # Deploy new binary
+            sudo mkdir -p /opt/workflow
+            sudo mv /tmp/$BINARY_NAME /opt/workflow/
+            sudo chmod +x /opt/workflow/$BINARY_NAME
+            sudo chown root:root /opt/workflow/$BINARY_NAME
+            
+            # Start service
+            sudo systemctl start $SERVICE_NAME
+            sudo systemctl enable $SERVICE_NAME
+            
+            # Check service status
+            sleep 2
+            sudo systemctl status $SERVICE_NAME --no-pager
+          EOF
+          
+          echo "✅ ${{ github.event.inputs.component }} deployed successfully"
+      
+      - name: Deployment Summary
+        run: |
+          echo "## Backend Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.event.inputs.branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Component**: ${{ github.event.inputs.component }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Host**: ${{ steps.target.outputs.host }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date)" >> $GITHUB_STEP_SUMMARY
+
+  notify:
+    needs: deploy-backend
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify Deployment Result
+        run: |
+          if [ "${{ needs.deploy-backend.result }}" == "success" ]; then
+            echo "✅ Backend deployment successful!"
+            echo "Branch: ${{ github.event.inputs.branch }}"
+            echo "Component: ${{ github.event.inputs.component }}"
+            echo "Environment: ${{ github.event.inputs.environment }}"
+          else
+            echo "❌ Backend deployment failed!"
+            echo "Please check the logs for more details."
+          fi
