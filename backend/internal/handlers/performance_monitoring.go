@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"local-backend-server/internal/infrastructure/database"
 	"local-backend-server/internal/services"
 )
 
@@ -136,11 +135,7 @@ func (h *PerformanceMonitoringHandler) ConfigureCache(c *gin.Context) {
 
 // getDatabaseMetrics retrieves database performance metrics
 func (h *PerformanceMonitoringHandler) getDatabaseMetrics() (map[string]interface{}, error) {
-	if dbConn, ok := h.db.ConnPool.(*database.DB); ok {
-		return dbConn.GetDatabaseStats()
-	}
-
-	// Fallback to basic connection pool stats
+	// Get basic connection pool stats from gorm
 	sqlDB, err := h.db.DB()
 	if err != nil {
 		return nil, err
@@ -201,10 +196,13 @@ func (h *PerformanceMonitoringHandler) getSystemMetrics() map[string]interface{}
 func (h *PerformanceMonitoringHandler) getOptimizationStats() map[string]interface{} {
 	cacheStats := h.optimizedService.GetCacheStats()
 
+	// Safely check cache entries - avoid type assertion issues
+	cacheActive := len(cacheStats) > 0
+
 	return map[string]interface{}{
 		"indexes_optimized":     true,
 		"connection_pooled":     true,
-		"cache_active":         cacheStats["data_cache_entries"].(int) > 0,
+		"cache_active":         cacheActive,
 		"prepared_statements":   true,
 		"performance_level":     "optimized",
 	}

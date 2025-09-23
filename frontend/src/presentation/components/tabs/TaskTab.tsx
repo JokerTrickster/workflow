@@ -52,10 +52,11 @@ import { GitHubIssue, GitHubPullRequest } from '../../../types/github';
 
 interface TaskTabProps {
   repository: Repository;
+  activeTab: string;
 }
 
 
-export function TaskTab({ repository }: TaskTabProps) {
+export function TaskTab({ repository, activeTab }: TaskTabProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -1104,54 +1105,45 @@ Task created on ${new Date().toISOString()}`;
     );
   };
 
+  // Render content based on activeTab from parent
+  const renderContent = () => {
+    if (activeTab === 'tasks') {
+      return renderTasks();
+    }
+
+    if (activeTab === 'issues') {
+      return renderGitHubContent(
+        'issues',
+        filteredIssues,
+        issuesLoading,
+        issuesError,
+        issuesErrorData as Error,
+        refetchIssues,
+        issuesFilter,
+        setIssuesFilter
+      );
+    }
+
+    if (activeTab === 'prs') {
+      return renderGitHubContent(
+        'prs',
+        filteredPRs,
+        prsLoading,
+        prsError,
+        prsErrorData as Error,
+        refetchPRs,
+        prsFilter,
+        setPrsFilter
+      );
+    }
+
+    // Default to tasks
+    return renderTasks();
+  };
+
   return (
     <>
-    <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="w-full h-full flex flex-col">
-      <TabsList className="grid w-full grid-cols-3 mb-6">
-        <TabsTrigger value="tasks" className="flex items-center gap-2">
-          <CheckCircle className="h-4 w-4" />
-          <span className="hidden sm:inline">Tasks</span>
-        </TabsTrigger>
-        <TabsTrigger value="issues" className="flex items-center gap-2">
-          <AlertCircle className="h-4 w-4" />
-          <span className="hidden sm:inline">Issues</span>
-        </TabsTrigger>
-        <TabsTrigger value="prs" className="flex items-center gap-2">
-          <GitPullRequest className="h-4 w-4" />
-          <span className="hidden sm:inline">PRs</span>
-        </TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="tasks" className="space-y-4 flex-1 min-h-0">
-        {renderTasks()}
-      </TabsContent>
-
-      <TabsContent value="issues" className="space-y-4 flex-1 min-h-0">
-        {renderGitHubContent(
-          'issues',
-          filteredIssues,
-          issuesLoading,
-          issuesError,
-          issuesErrorData as Error,
-          refetchIssues,
-          issuesFilter,
-          setIssuesFilter
-        )}
-      </TabsContent>
-
-      <TabsContent value="prs" className="space-y-4 flex-1 min-h-0">
-        {renderGitHubContent(
-          'prs',
-          filteredPRs,
-          prsLoading,
-          prsError,
-          prsErrorData as Error,
-          refetchPRs,
-          prsFilter,
-          setPrsFilter
-        )}
-      </TabsContent>
-    </Tabs>
+      {renderContent()}
 
     {/* Task Detail Modal */}
     <Dialog open={showTaskDetailDialog} onOpenChange={setShowTaskDetailDialog}>

@@ -6,11 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
-import { ExternalLink, Activity, BarChart3, AlertCircle, CheckCircle, History } from 'lucide-react';
+import { ExternalLink, Activity, AlertCircle, CheckCircle } from 'lucide-react';
 import { TaskTab } from './tabs/TaskTab';
-import { LogsTab } from './tabs/LogsTab';
-import { DashboardTab } from './tabs/DashboardTab';
-import { TaskHistory } from '../../components/TaskHistory';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 
 interface WorkspacePanelProps {
@@ -100,7 +97,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
 
     // Restore tab state for this repository
     const savedTab = localStorage.getItem(`workspace-tab-${repository.id}`);
-    if (savedTab && ['tasks', 'history', 'logs', 'dashboard'].includes(savedTab)) {
+    if (savedTab && ['tasks', 'issues', 'prs'].includes(savedTab)) {
       setActiveTab(savedTab);
     }
   }, [repository.id, repository.name]);
@@ -113,19 +110,24 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
   // Show connection message for non-connected repositories
   if (!repository.is_connected) {
     return (
-      <div className="fixed inset-0 bg-background z-50 flex flex-col safe-area-inset">
+      <div className="fixed inset-0 bg-background z-50 flex flex-col">
         {/* Header */}
         <div className="border-b bg-card">
-          <div className="container mx-auto max-w-7xl px-4 py-4 px-safe-4">
+          <div className="container mx-auto max-w-7xl px-4 py-4">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <h1 className="text-xl md:text-2xl font-bold">{repository.name}</h1>
-                  <Badge variant={repository.private ? "secondary" : "outline"}>
+                  <h1 className="text-lg md:text-2xl font-bold truncate">{repository.name}</h1>
+                  <Badge variant={repository.private ? "secondary" : "outline"} className="text-xs md:text-sm">
                     {repository.private ? 'Private' : 'Public'}
                   </Badge>
+                  <Badge variant="destructive" className="text-xs md:text-sm">
+                    Not Connected
+                  </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">{repository.description}</p>
+                {repository.description && (
+                  <p className="text-sm text-muted-foreground truncate">{repository.description}</p>
+                )}
               </div>
               <Button variant="outline" onClick={onClose} className="shrink-0">
                 ← Back
@@ -135,7 +137,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 container mx-auto max-w-7xl px-4 py-6 px-safe-4">
+        <div className="flex-1 container mx-auto max-w-7xl px-4 py-6">
           <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
             <AlertCircle className="h-16 w-16 text-muted-foreground" />
             <div className="space-y-2">
@@ -145,7 +147,7 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
                 Please connect the repository first to view tasks, logs, and dashboard.
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Button variant="outline" onClick={onClose}>
                 ← Back to Repositories
               </Button>
@@ -162,30 +164,33 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
     );
   }
 
-  // For connected repositories, show the 3-tab interface
+  // For connected repositories, show the responsive interface
   return (
-    <div className="fixed inset-0 bg-background z-50 flex flex-col safe-area-inset">
-      {/* Header */}
+    <div className="fixed inset-0 bg-background z-50 flex flex-col">
+      {/* Responsive Header */}
       <div className="border-b bg-card">
-        <div className="container mx-auto max-w-7xl px-4 py-4 px-safe-4">
+        <div className="container mx-auto max-w-7xl px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-xl md:text-2xl font-bold">{repository.name}</h1>
-                <Badge variant={repository.private ? "secondary" : "outline"}>
+                <h1 className="text-lg md:text-2xl font-bold truncate">{repository.name}</h1>
+                <Badge variant={repository.private ? "secondary" : "outline"} className="text-xs md:text-sm">
                   {repository.private ? 'Private' : 'Public'}
                 </Badge>
-                <Badge variant="default" className="bg-green-100 text-green-800">
+                <Badge variant="default" className="bg-green-100 text-green-800 text-xs md:text-sm">
                   Connected
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground">{repository.description}</p>
+              {repository.description && (
+                <p className="text-sm text-muted-foreground truncate">{repository.description}</p>
+              )}
             </div>
             <div className="flex gap-2 items-center">
               <Button variant="outline" size="sm" asChild>
-                <a href={repository.html_url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View on GitHub
+                <a href={repository.html_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="hidden sm:inline">View on GitHub</span>
+                  <span className="sm:hidden">GitHub</span>
                 </a>
               </Button>
               <Button variant="outline" onClick={onClose} className="shrink-0">
@@ -196,213 +201,64 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content with responsive tabs */}
       <div className="flex-1 overflow-hidden">
-        <div className="container mx-auto max-w-7xl px-4 py-6 px-safe-4 h-full">
+        <div className="container mx-auto max-w-7xl px-4 py-6 h-full">
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full h-full flex flex-col">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
-            <TabsTrigger value="tasks" className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Tasks</span>
-            </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              <span className="hidden sm:inline">History</span>
-            </TabsTrigger>
-            <TabsTrigger value="logs" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              <span className="hidden sm:inline">Logs</span>
-            </TabsTrigger>
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-            </TabsTrigger>
-          </TabsList>
+            {/* Simplified Tab Navigation */}
+            <TabsList className="grid w-full grid-cols-3 mb-6 h-10 md:h-12">
+              <TabsTrigger value="tasks" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <CheckCircle className="h-3 w-3 md:h-4 md:w-4" />
+                <span>Tasks</span>
+              </TabsTrigger>
+              <TabsTrigger value="issues" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <AlertCircle className="h-3 w-3 md:h-4 md:w-4" />
+                <span>Issues</span>
+              </TabsTrigger>
+              <TabsTrigger value="prs" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <Activity className="h-3 w-3 md:h-4 md:w-4" />
+                <span>PRs</span>
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="tasks" className="space-y-4 flex-1 overflow-y-auto min-h-0">
-            <ErrorBoundary
-              level="component"
-              showDetails={process.env.NODE_ENV === 'development'}
-              onError={(error, errorInfo) => {
-                console.error('TaskTab Error:', error, errorInfo);
-                // Log to activity logger if available
-              }}
-              fallback={(error, resetError) => (
-                <Card className="border-red-200 bg-red-50">
-                  <CardHeader>
-                    <CardTitle className="text-red-900 flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5" />
-                      Tasks Tab Error
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-red-700 mb-4">
-                      The tasks tab encountered an error and couldn&apos;t load properly.
-                    </p>
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={resetError}>
-                        Try Again
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => window.location.reload()}
-                      >
-                        Refresh Page
-                      </Button>
-                    </div>
-                    {process.env.NODE_ENV === 'development' && (
-                      <details className="mt-4 text-xs">
-                        <summary className="cursor-pointer font-medium">Technical Details</summary>
-                        <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
-                          {error.message}
-                        </pre>
-                      </details>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            >
-              <TaskTab repository={repository} />
-            </ErrorBoundary>
-          </TabsContent>
-
-          <TabsContent value="history" className="space-y-4 flex-1 overflow-y-auto min-h-0">
-            <ErrorBoundary
-              level="component"
-              showDetails={process.env.NODE_ENV === 'development'}
-              onError={(error, errorInfo) => {
-                console.error('TaskHistory Error:', error, errorInfo);
-              }}
-              fallback={(error, resetError) => (
-                <Card className="border-red-200 bg-red-50">
-                  <CardHeader>
-                    <CardTitle className="text-red-900 flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5" />
-                      Task History Error
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-red-700 mb-4">
-                      The task history tab encountered an error and couldn&apos;t load properly.
-                    </p>
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={resetError}>
-                        Try Again
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => window.location.reload()}
-                      >
-                        Refresh Page
-                      </Button>
-                    </div>
-                    {process.env.NODE_ENV === 'development' && (
-                      <details className="mt-4 text-xs">
-                        <summary className="cursor-pointer font-medium">Technical Details</summary>
-                        <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
-                          {error.message}
-                        </pre>
-                      </details>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            >
-              <TaskHistory repository={repository} />
-            </ErrorBoundary>
-          </TabsContent>
-
-          <TabsContent value="logs" className="space-y-4 flex-1 overflow-y-auto min-h-0">
-            <ErrorBoundary 
-              level="component" 
-              showDetails={process.env.NODE_ENV === 'development'}
-              onError={(error, errorInfo) => {
-                console.error('LogsTab Error:', error, errorInfo);
-              }}
-              fallback={(error, resetError) => (
-                <Card className="border-red-200 bg-red-50">
-                  <CardHeader>
-                    <CardTitle className="text-red-900 flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5" />
-                      Logs Tab Error
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-red-700 mb-4">
-                      The activity logs tab encountered an error and couldn&apos;t load properly.
-                    </p>
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={resetError}>
-                        Try Again
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => window.location.reload()}
-                      >
-                        Refresh Page
-                      </Button>
-                    </div>
-                    {process.env.NODE_ENV === 'development' && (
-                      <details className="mt-4 text-xs">
-                        <summary className="cursor-pointer font-medium">Technical Details</summary>
-                        <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
-                          {error.message}
-                        </pre>
-                      </details>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            >
-              <LogsTab repository={repository} />
-            </ErrorBoundary>
-          </TabsContent>
-
-          <TabsContent value="dashboard" className="space-y-4 flex-1 overflow-y-auto min-h-0">
-            <ErrorBoundary 
-              level="component" 
-              showDetails={process.env.NODE_ENV === 'development'}
-              onError={(error, errorInfo) => {
-                console.error('DashboardTab Error:', error, errorInfo);
-              }}
-              fallback={(error, resetError) => (
-                <Card className="border-red-200 bg-red-50">
-                  <CardHeader>
-                    <CardTitle className="text-red-900 flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5" />
-                      Dashboard Tab Error
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-red-700 mb-4">
-                      The dashboard tab encountered an error and couldn&apos;t load properly.
-                    </p>
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={resetError}>
-                        Try Again
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => window.location.reload()}
-                      >
-                        Refresh Page
-                      </Button>
-                    </div>
-                    {process.env.NODE_ENV === 'development' && (
-                      <details className="mt-4 text-xs">
-                        <summary className="cursor-pointer font-medium">Technical Details</summary>
-                        <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
-                          {error.message}
-                        </pre>
-                      </details>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            >
-              <DashboardTab repository={repository} />
-            </ErrorBoundary>
-          </TabsContent>
+            {/* Tab Content */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <ErrorBoundary
+                level="component"
+                showDetails={process.env.NODE_ENV === 'development'}
+                onError={(error, errorInfo) => {
+                  console.error('TaskTab Error:', error, errorInfo);
+                }}
+                fallback={(error, resetError) => (
+                  <Card className="border-red-200 bg-red-50">
+                    <CardHeader>
+                      <CardTitle className="text-red-900 flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5" />
+                        Tasks Tab Error
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-red-700 mb-4">
+                        The tasks tab encountered an error and couldn&apos;t load properly.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={resetError}>
+                          Try Again
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => window.location.reload()}
+                        >
+                          Refresh Page
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              >
+                <TaskTab repository={repository} activeTab={activeTab} />
+              </ErrorBoundary>
+            </div>
           </Tabs>
         </div>
       </div>
