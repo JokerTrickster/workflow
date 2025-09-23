@@ -1,0 +1,298 @@
+basePath: /api/v1
+definitions:
+  request.CreateTaskRequest:
+    properties:
+      cmd:
+        description: 명령어 (옵션)
+        type: string
+      interactive:
+        description: '대화형 모드: 여러 작업을 순차 실행'
+        type: boolean
+      provider:
+        description: AI 제공자 (필수)
+        enum:
+        - claude
+        - codex
+        - cursor
+        type: string
+      repository_name:
+        description: 레포지토리 이름 (필수)
+        type: string
+      tasks:
+        description: 실행할 작업 내용
+        type: string
+      working_dir:
+        description: 작업 디렉토리 (옵션)
+        type: string
+    required:
+    - provider
+    - repository_name
+    - tasks
+    type: object
+  response.CancelTaskResponse:
+    properties:
+      cancelled_at:
+        type: string
+      message:
+        type: string
+      request_id:
+        type: string
+      status:
+        type: string
+    type: object
+  response.CreateTaskResponse:
+    properties:
+      created_at:
+        type: string
+      message:
+        type: string
+      request_id:
+        type: string
+      status:
+        type: string
+    type: object
+  response.ExecuteTaskResponse:
+    properties:
+      message:
+        type: string
+      request_id:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  response.ListTasksResponse:
+    properties:
+      has_more:
+        type: boolean
+      limit:
+        type: integer
+      page:
+        type: integer
+      tasks:
+        items:
+          $ref: '#/definitions/response.TaskResponse'
+        type: array
+      total_count:
+        type: integer
+    type: object
+  response.TaskResponse:
+    properties:
+      cmd:
+        type: string
+      completed_at:
+        type: string
+      created_at:
+        type: string
+      error:
+        type: string
+      id:
+        type: integer
+      interactive:
+        type: boolean
+      processing_time_ms:
+        type: integer
+      provider:
+        type: string
+      repository_name:
+        type: string
+      request_id:
+        type: string
+      result:
+        type: string
+      status:
+        type: string
+      tasks:
+        type: string
+      updated_at:
+        type: string
+      working_dir:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: This is a workflow management backend server API
+  title: Workflow Backend API
+  version: "1.0"
+paths:
+  /api/v1/tasks:
+    get:
+      consumes:
+      - application/json
+      description: List tasks by repository with pagination
+      parameters:
+      - description: Repository name
+        in: query
+        name: repository_name
+        required: true
+        type: string
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 20, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ListTasksResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List tasks
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      description: Create a new workflow task
+      parameters:
+      - description: Task creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.CreateTaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a new task
+      tags:
+      - tasks
+  /api/v1/tasks/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Cancel a task (soft delete)
+      parameters:
+      - description: Task Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.CancelTaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Cancel a task
+      tags:
+      - tasks
+  /api/v1/tasks/{id}/execute:
+    post:
+      consumes:
+      - application/json
+      description: Execute a task by queueing it to RabbitMQ
+      parameters:
+      - description: Task Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ExecuteTaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Execute a task
+      tags:
+      - tasks
+  /api/v1/tasks/{id}/status:
+    get:
+      consumes:
+      - application/json
+      description: Get the current status of a task
+      parameters:
+      - description: Task Request ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.TaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get task status
+      tags:
+      - tasks
+swagger: "2.0"
