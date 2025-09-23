@@ -14,7 +14,7 @@ export interface ApiDataSource {
   getRepositoryStatus(repoId: number): Promise<{ connected: boolean; localPath?: string }>;
   
   // Tasks
-  getTasks(repositoryId: number): Promise<Task[]>;
+  getTasks(repositoryName: string): Promise<Task[]>;
   createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task>;
   updateTask(id: string, updates: Partial<Task>): Promise<Task>;
   deleteTask(id: string): Promise<void>;

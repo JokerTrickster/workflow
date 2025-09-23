@@ -35,8 +35,8 @@ export class ApiDataSourceImpl implements ApiDataSource {
     return await apiClient.get(`/repos/${repoId}/status`);
   }
 
-  async getTasks(repositoryId: number): Promise<Task[]> {
-    return await apiClient.get<Task[]>(`/tasks?repository_id=${repositoryId}`);
+  async getTasks(repositoryName: string): Promise<Task[]> {
+    return await apiClient.get<Task[]>(`/tasks?repository_name=${encodeURIComponent(repositoryName)}`);
   }
 
   async createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task> {

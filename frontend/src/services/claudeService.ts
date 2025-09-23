@@ -4,9 +4,10 @@ import { apiClient } from '../infrastructure/api/ApiClient';
 export interface ReqRunTasksClaude {
   tasks: string;           // 실행할 작업 내용
   repository_name: string; // 레포지토리 이름 (필수)
+  provider: 'claude' | 'codex' | 'cursor'; // AI 제공자 (필수)
   working_dir?: string;    // 작업 디렉토리 (옵션)
   interactive?: boolean;   // 대화형 모드: 여러 작업을 순차 실행
-  claude_cmd?: string;     // Claude CLI 명령어 경로 (옵션)
+  cmd?: string;           // 명령어 (옵션)
   continue_task?: boolean; // 기존 작업 이어서 하기 (옵션)
 }
 
@@ -38,11 +39,13 @@ export interface WorkflowHistory {
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
   tasks: string;
   repository_name: string;
+  provider: 'claude' | 'codex' | 'cursor';
   working_dir?: string;
-  claude_cmd?: string;
+  cmd?: string;
   interactive: boolean;
-  continue_task: boolean;
+  continue_task?: boolean;
   created_at: string;
+  updated_at: string;
   completed_at?: string;
   processing_time_ms?: number;
   result?: string;
@@ -57,8 +60,11 @@ export interface PaginationMeta {
 }
 
 export interface TaskHistoryResponse {
-  data: WorkflowHistory[];
-  pagination: PaginationMeta;
+  tasks: WorkflowHistory[];
+  total_count: number;
+  page: number;
+  limit: number;
+  has_more: boolean;
 }
 
 export interface TaskHistoryParams {
@@ -84,7 +90,7 @@ export class ClaudeService {
    */
   async runTasks(request: ReqRunTasksClaude): Promise<ClaudeTaskResponse> {
     try {
-      const response = await apiClient.post<ClaudeTaskResponse>('/claude/run-tasks', request);
+      const response = await apiClient.post<ClaudeTaskResponse>('/tasks', request);
       return response;
     } catch (error) {
       console.error('Failed to submit Claude task:', error);
@@ -97,7 +103,7 @@ export class ClaudeService {
    */
   async getTaskStatus(requestId: string): Promise<TaskStatus> {
     try {
-      const response = await apiClient.get<TaskStatus>(`/claude/tasks/${requestId}/status`);
+      const response = await apiClient.get<TaskStatus>(`/tasks/${requestId}/status`);
       return response;
     } catch (error) {
       console.error('Failed to get task status:', error);
@@ -110,7 +116,7 @@ export class ClaudeService {
    */
   async cancelTask(requestId: string): Promise<void> {
     try {
-      await apiClient.post(`/claude/tasks/${requestId}/cancel`);
+      await apiClient.delete(`/tasks/${requestId}`);
     } catch (error) {
       console.error('Failed to cancel task:', error);
       throw error;
@@ -175,12 +181,11 @@ export class ClaudeService {
   ): Promise<TaskHistoryResponse> {
     try {
       const queryParams = new URLSearchParams();
+      queryParams.append('repository_name', repositoryName);
       if (params.page) queryParams.append('page', params.page.toString());
       if (params.limit) queryParams.append('limit', params.limit.toString());
 
-      const endpoint = `/tasks/history/${encodeURIComponent(repositoryName)}${
-        queryParams.toString() ? '?' + queryParams.toString() : ''
-      }`;
+      const endpoint = `/tasks?${queryParams.toString()}`;
 
       const response = await apiClient.get<TaskHistoryResponse>(endpoint);
       return response;

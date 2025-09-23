@@ -17,3 +17,4 @@ local-backend/*.db
 
 # Binary files
 local-backend/server
+backend/main

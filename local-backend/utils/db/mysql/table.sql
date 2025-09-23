@@ -21,9 +21,10 @@ CREATE TABLE IF NOT EXISTS workflow_histories (
     tasks TEXT NOT NULL COMMENT '작업 내용',
     repository_name VARCHAR(255) NOT NULL COMMENT '저장소 이름',
     working_dir VARCHAR(500) COMMENT '작업 디렉토리 경로',
-    claude_cmd VARCHAR(1000) COMMENT 'Claude 명령어',
+    cmd VARCHAR(1000) COMMENT '명령어',
     interactive BOOLEAN DEFAULT FALSE COMMENT '인터랙티브 모드 여부',
     continue_task BOOLEAN DEFAULT FALSE COMMENT '작업 계속 여부',
+    provider varchar(500) default 'claude',
     
     -- 실행 시간 정보
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '생성 시간',

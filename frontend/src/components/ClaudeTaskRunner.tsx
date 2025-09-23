@@ -18,9 +18,10 @@ export function ClaudeTaskRunner({
   const [formData, setFormData] = useState<ReqRunTasksClaude>({
     tasks: '',
     repository_name: defaultRepository,
+    provider: 'claude',
     working_dir: defaultWorkingDir,
     interactive: false,
-    claude_cmd: '',
+    cmd: '',
     continue_task: false,
   });
 
@@ -109,15 +110,31 @@ export function ClaudeTaskRunner({
         </div>
 
         <div>
-          <label htmlFor="claude_cmd" className="block text-sm font-medium text-gray-700">
-            Claude Command Path (Optional)
+          <label htmlFor="provider" className="block text-sm font-medium text-gray-700">
+            AI Provider
+          </label>
+          <select
+            id="provider"
+            value={formData.provider}
+            onChange={(e) => setFormData({ ...formData, provider: e.target.value as 'claude' | 'codex' | 'cursor' })}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          >
+            <option value="claude">Claude</option>
+            <option value="codex">Codex</option>
+            <option value="cursor">Cursor</option>
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="cmd" className="block text-sm font-medium text-gray-700">
+            Command (Optional)
           </label>
           <input
             type="text"
-            id="claude_cmd"
-            value={formData.claude_cmd}
-            onChange={(e) => setFormData({ ...formData, claude_cmd: e.target.value })}
-            placeholder="e.g., /usr/local/bin/claude"
+            id="cmd"
+            value={formData.cmd}
+            onChange={(e) => setFormData({ ...formData, cmd: e.target.value })}
+            placeholder="e.g., echo test"
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           />
         </div>
