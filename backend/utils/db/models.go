@@ -7,7 +7,7 @@ import (
 // Task represents a workflow task record
 type Task struct {
 	ID               uint64     `json:"id" gorm:"primaryKey;column:id"`
-	RequestID        string     `json:"request_id" gorm:"column:request_id;uniqueIndex;not null"`
+	RequestID        string     `json:"request_id" gorm:"column:request_id;type:varchar(255);uniqueIndex;not null"`
 	Status           string     `json:"status" gorm:"column:status;index;not null;default:pending"`
 	Tasks            string     `json:"tasks" gorm:"column:tasks;type:text;not null"`
 	RepositoryName   string     `json:"repository_name" gorm:"column:repository_name;index;not null"`
@@ -25,7 +25,7 @@ type Task struct {
 
 // TableName specifies the table name for Task model
 func (Task) TableName() string {
-	return "tasks"
+	return "workflow_histories"
 }
 
 // TaskStatus constants for status field

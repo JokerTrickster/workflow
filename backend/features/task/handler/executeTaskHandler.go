@@ -9,12 +9,12 @@ import (
 )
 
 type ExecuteTaskHandler struct {
-	taskUseCase _interface.ITaskUseCase
+	executeTaskUseCase _interface.IExecuteTaskUseCase
 }
 
-func NewExecuteTaskHandler(e *echo.Echo, taskUseCase _interface.ITaskUseCase) _interface.IExecuteTaskHandler {
+func NewExecuteTaskHandler(e *echo.Echo, executeTaskUseCase _interface.IExecuteTaskUseCase) _interface.IExecuteTaskHandler {
 	handler := &ExecuteTaskHandler{
-		taskUseCase: taskUseCase,
+		executeTaskUseCase: executeTaskUseCase,
 	}
 
 	// API 라우트 등록
@@ -43,7 +43,7 @@ func (h *ExecuteTaskHandler) ExecuteTask(c echo.Context) error {
 		})
 	}
 
-	result, err := h.taskUseCase.ExecuteTask(requestID)
+	result, err := h.executeTaskUseCase.ExecuteTask(requestID)
 	if err != nil {
 		if err.Error() == "failed to get task: task not found with request_id: "+requestID {
 			return c.JSON(http.StatusNotFound, map[string]any{
@@ -59,4 +59,3 @@ func (h *ExecuteTaskHandler) ExecuteTask(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, result)
 }
-

@@ -8,19 +8,24 @@ import (
 )
 
 func NewTaskHandler(e *echo.Echo) {
-	// Repository와 UseCase 초기화
-	taskRepo := repository.NewTaskRepository()
-	taskUC := usecase.NewTaskUseCase()
+	// 개별 Repository 초기화
+	createTaskRepo := repository.NewCreateTaskRepository()
+	executeTaskRepo := repository.NewExecuteTaskRepository()
+	cancelTaskRepo := repository.NewCancelTaskRepository()
+	listTasksRepo := repository.NewListTasksRepository()
+	getTaskStatusRepo := repository.NewGetTaskStatusRepository()
 
-	// UseCase에 Repository 주입
-	if uc, ok := taskUC.(*usecase.TaskUseCase); ok {
-		uc.SetRepository(taskRepo)
-	}
+	// 개별 UseCase 초기화
+	createTaskUC := usecase.NewCreateTaskUseCase(createTaskRepo)
+	executeTaskUC := usecase.NewExecuteTaskUseCase(executeTaskRepo)
+	cancelTaskUC := usecase.NewCancelTaskUseCase(cancelTaskRepo)
+	listTasksUC := usecase.NewListTasksUseCase(listTasksRepo)
+	getTaskStatusUC := usecase.NewGetTaskStatusUseCase(getTaskStatusRepo)
 
 	// 각 API Handler 초기화
-	NewCreateTaskHandler(e, taskUC)
-	NewExecuteTaskHandler(e, taskUC)
-	NewCancelTaskHandler(e, taskUC)
-	NewListTasksHandler(e, taskUC)
-	NewGetTaskStatusHandler(e, taskUC)
+	NewCreateTaskHandler(e, createTaskUC)
+	NewExecuteTaskHandler(e, executeTaskUC)
+	NewCancelTaskHandler(e, cancelTaskUC)
+	NewListTasksHandler(e, listTasksUC)
+	NewGetTaskStatusHandler(e, getTaskStatusUC)
 }

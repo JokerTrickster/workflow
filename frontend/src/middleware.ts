@@ -19,7 +19,7 @@ export function middleware(request: NextRequest) {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' blob: data: https: http:",
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self' https://api.github.com https://*.supabase.co wss://*.supabase.co",
+    "connect-src 'self' http://localhost:8080 https://api.github.com https://*.supabase.co wss://*.supabase.co",
     "frame-src 'self' https://github.com",
     "worker-src 'self' blob:",
     "child-src 'self'",

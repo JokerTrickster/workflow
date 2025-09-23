@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 )
 
@@ -11,7 +12,12 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	DSN string
+	DSN      string
+	Host     string
+	Port     string
+	Name     string
+	User     string
+	Password string
 }
 
 type RabbitMQConfig struct {
@@ -27,9 +33,25 @@ type ServerConfig struct {
 var GlobalConfig *Config
 
 func InitConfig() error {
+	// Build MySQL DSN from individual components
+	dbHost := getEnv("DB_HOST", "localhost")
+	dbPort := getEnv("DB_PORT", "3306")
+	dbName := getEnv("DB_NAME", "dev_workflow")
+	dbUser := getEnv("DB_USERNAME", "root")
+	dbPassword := getEnv("DB_PASSWORD", "")
+
+	// MySQL DSN format: user:password@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
+	mysqlDSN := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		dbUser, dbPassword, dbHost, dbPort, dbName)
+
 	GlobalConfig = &Config{
 		Database: DatabaseConfig{
-			DSN: getEnv("DATABASE_DSN", "./data/workflow.db"),
+			DSN:      mysqlDSN,
+			Host:     dbHost,
+			Port:     dbPort,
+			Name:     dbName,
+			User:     dbUser,
+			Password: dbPassword,
 		},
 		RabbitMQ: RabbitMQConfig{
 			URL:       getEnv("RABBITMQ_URL", "amqp://localhost:5672"),

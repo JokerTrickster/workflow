@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"main/utils/config"
 
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -14,8 +14,13 @@ var DB *gorm.DB
 func InitDB() error {
 	var err error
 
-	// SQLite 데이터베이스 연결
-	DB, err = gorm.Open(sqlite.Open(config.GlobalConfig.Database.DSN), &gorm.Config{
+	// MySQL 데이터베이스 연결
+	fmt.Printf("Connecting to MySQL at %s:%s/%s\n",
+		config.GlobalConfig.Database.Host,
+		config.GlobalConfig.Database.Port,
+		config.GlobalConfig.Database.Name)
+
+	DB, err = gorm.Open(mysql.Open(config.GlobalConfig.Database.DSN), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {

@@ -9,12 +9,12 @@ import (
 )
 
 type CancelTaskHandler struct {
-	taskUseCase _interface.ITaskUseCase
+	cancelTaskUseCase _interface.ICancelTaskUseCase
 }
 
-func NewCancelTaskHandler(e *echo.Echo, taskUseCase _interface.ITaskUseCase) _interface.ICancelTaskHandler {
+func NewCancelTaskHandler(e *echo.Echo, cancelTaskUseCase _interface.ICancelTaskUseCase) _interface.ICancelTaskHandler {
 	handler := &CancelTaskHandler{
-		taskUseCase: taskUseCase,
+		cancelTaskUseCase: cancelTaskUseCase,
 	}
 
 	// API 라우트 등록
@@ -43,7 +43,7 @@ func (h *CancelTaskHandler) CancelTask(c echo.Context) error {
 		})
 	}
 
-	result, err := h.taskUseCase.CancelTask(requestID)
+	result, err := h.cancelTaskUseCase.CancelTask(requestID)
 	if err != nil {
 		if err.Error() == "failed to get task: task not found with request_id: "+requestID {
 			return c.JSON(http.StatusNotFound, map[string]any{

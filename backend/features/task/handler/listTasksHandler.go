@@ -12,14 +12,14 @@ import (
 )
 
 type ListTasksHandler struct {
-	taskUseCase _interface.ITaskUseCase
-	validator   *validator.Validate
+	listTasksUseCase _interface.IListTasksUseCase
+	validator        *validator.Validate
 }
 
-func NewListTasksHandler(e *echo.Echo, taskUseCase _interface.ITaskUseCase) _interface.IListTasksHandler {
+func NewListTasksHandler(e *echo.Echo, listTasksUseCase _interface.IListTasksUseCase) _interface.IListTasksHandler {
 	handler := &ListTasksHandler{
-		taskUseCase: taskUseCase,
-		validator:   validator.New(),
+		listTasksUseCase: listTasksUseCase,
+		validator:        validator.New(),
 	}
 
 	// API 라우트 등록
@@ -85,7 +85,7 @@ func (h *ListTasksHandler) ListTasks(c echo.Context) error {
 		})
 	}
 
-	result, err := h.taskUseCase.ListTasks(&req)
+	result, err := h.listTasksUseCase.ListTasks(&req)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]any{
 			"error":   "Failed to list tasks",

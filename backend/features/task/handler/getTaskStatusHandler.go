@@ -9,12 +9,12 @@ import (
 )
 
 type GetTaskStatusHandler struct {
-	taskUseCase _interface.ITaskUseCase
+	getTaskStatusUseCase _interface.IGetTaskStatusUseCase
 }
 
-func NewGetTaskStatusHandler(e *echo.Echo, taskUseCase _interface.ITaskUseCase) _interface.IGetTaskStatusHandler {
+func NewGetTaskStatusHandler(e *echo.Echo, getTaskStatusUseCase _interface.IGetTaskStatusUseCase) _interface.IGetTaskStatusHandler {
 	handler := &GetTaskStatusHandler{
-		taskUseCase: taskUseCase,
+		getTaskStatusUseCase: getTaskStatusUseCase,
 	}
 
 	// API 라우트 등록
@@ -43,7 +43,7 @@ func (h *GetTaskStatusHandler) GetTaskStatus(c echo.Context) error {
 		})
 	}
 
-	result, err := h.taskUseCase.GetTaskStatus(requestID)
+	result, err := h.getTaskStatusUseCase.GetTaskStatus(requestID)
 	if err != nil {
 		if err.Error() == "failed to get task: task not found with request_id: "+requestID {
 			return c.JSON(http.StatusNotFound, map[string]any{

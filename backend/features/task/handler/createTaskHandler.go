@@ -11,14 +11,14 @@ import (
 )
 
 type CreateTaskHandler struct {
-	taskUseCase _interface.ITaskUseCase
-	validator   *validator.Validate
+	createTaskUseCase _interface.ICreateTaskUseCase
+	validator         *validator.Validate
 }
 
-func NewCreateTaskHandler(e *echo.Echo, taskUseCase _interface.ITaskUseCase) _interface.ICreateTaskHandler {
+func NewCreateTaskHandler(e *echo.Echo, createTaskUseCase _interface.ICreateTaskUseCase) _interface.ICreateTaskHandler {
 	handler := &CreateTaskHandler{
-		taskUseCase: taskUseCase,
-		validator:   validator.New(),
+		createTaskUseCase: createTaskUseCase,
+		validator:         validator.New(),
 	}
 
 	// API 라우트 등록
@@ -54,7 +54,7 @@ func (h *CreateTaskHandler) CreateTask(c echo.Context) error {
 		})
 	}
 
-	result, err := h.taskUseCase.CreateTask(&req)
+	result, err := h.createTaskUseCase.CreateTask(&req)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]any{
 			"error":   "Failed to create task",

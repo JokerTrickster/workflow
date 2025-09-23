@@ -90,41 +90,45 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
   const loadTasks = useCallback(async (forceRefresh = true) => {
     setIsLoadingTasks(true);
     try {
-      // Clear all caches to ensure fresh data
-      taskFileManager.clearCache();
-      
-      // Aggressive browser cache clearing
-      try {
-        // Clear specific repository caches
-        localStorage.removeItem(`tasks-${repository.name}`);
-        sessionStorage.removeItem(`tasks-${repository.name}`);
-        
-        // Clear all related cache keys
-        ['tasks', 'epic', 'github', 'issues', 'prs', 'cache', 'api'].forEach(prefix => {
-          Object.keys(localStorage).forEach(key => {
-            if (key.includes(prefix) && key.includes(repository.name)) {
-              localStorage.removeItem(key);
-            }
-          });
-          Object.keys(sessionStorage).forEach(key => {
-            if (key.includes(prefix) && key.includes(repository.name)) {
-              sessionStorage.removeItem(key);
-            }
-          });
-        });
-        
-        console.log('🧹 TaskTab: Cleared all caches for', repository.name);
-      } catch {
-        // Ignore storage errors
+      // Load tasks from backend API
+      const apiResponse = await fetch(`http://localhost:8080/api/v1/tasks?repository_name=${repository.name}`);
+
+      if (apiResponse.ok) {
+        const apiResult = await apiResponse.json();
+        console.log('✅ Tasks loaded from backend:', apiResult.tasks?.length || 0);
+
+        // Convert backend task format to frontend task format
+        const convertedTasks: Task[] = (apiResult.tasks || []).map((backendTask: any) => ({
+          id: backendTask.request_id,
+          title: backendTask.tasks.split('\n')[0] || 'Untitled Task',
+          description: backendTask.tasks,
+          status: backendTask.status,
+          repository: backendTask.repository_name,
+          epic: 'backend-tasks',
+          branch: backendTask.working_dir || undefined,
+          created_at: backendTask.created_at,
+          updated_at: backendTask.updated_at
+        }));
+
+        setTasks(convertedTasks);
+        console.log(`Loaded ${convertedTasks.length} tasks from backend for repository: ${repository.name}`);
+      } else {
+        console.warn('⚠️ Failed to load tasks from backend, falling back to file manager');
+        // Fallback to file manager
+        const loadedTasks = await taskFileManager.loadTasksFromEpics(repository.name, forceRefresh);
+        setTasks(loadedTasks);
+        console.log(`Loaded ${loadedTasks.length} tasks from files for repository: ${repository.name}`);
       }
-      
-      // Use repository name from props with force refresh
-      const loadedTasks = await taskFileManager.loadTasksFromEpics(repository.name, forceRefresh);
-      setTasks(loadedTasks);
-      
-      console.log(`Loaded ${loadedTasks.length} tasks for repository: ${repository.name}`);
     } catch (error) {
-      console.error('Failed to load tasks:', error);
+      console.error('Failed to load tasks from backend, falling back to file manager:', error);
+      // Fallback to file manager
+      try {
+        const loadedTasks = await taskFileManager.loadTasksFromEpics(repository.name, forceRefresh);
+        setTasks(loadedTasks);
+        console.log(`Loaded ${loadedTasks.length} tasks from files for repository: ${repository.name}`);
+      } catch (fileError) {
+        console.error('Failed to load tasks from files:', fileError);
+      }
     } finally {
       setIsLoadingTasks(false);
     }
@@ -232,7 +236,35 @@ ${selectedGitHubIssue ? `## GitHub Issue
 ## Notes
 Task created on ${new Date().toISOString()}`;
 
-      // Create task file
+      // 1. Create task in backend database
+      try {
+        const apiResponse = await fetch('http://localhost:8080/api/v1/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tasks: taskData.description,
+            repository_name: repository.name,
+            provider: 'claude',
+            working_dir: taskData.branch_name || undefined,
+            cmd: undefined,
+            interactive: false
+          })
+        });
+
+        if (apiResponse.ok) {
+          const apiResult = await apiResponse.json();
+          console.log('✅ Task created in database:', apiResult.request_id);
+        } else {
+          console.warn('⚠️ Failed to save task to database:', await apiResponse.text());
+        }
+      } catch (apiError) {
+        console.error('❌ Database API error:', apiError);
+        // Continue with file creation even if API fails
+      }
+
+      // 2. Create task file (existing functionality)
       const taskFile = await taskFileManager.createTaskFile({
         title: taskData.title,
         status: taskData.status,
