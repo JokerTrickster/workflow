@@ -81,20 +81,24 @@ func (u *TaskUseCase) ExecuteTask(requestID string) (*response.ExecuteTaskRespon
 	}
 
 	// RabbitMQ에 메시지 전송
+	// Handle pointer types
+	workingDir := ""
+	if task.WorkingDir != nil {
+		workingDir = *task.WorkingDir
+	}
+	cmd := ""
+	if task.Cmd != nil {
+		cmd = *task.Cmd
+	}
+
 	taskMessage := &utils.TaskMessage{
-		RequestID:      task.RequestID,
-		Type:           "task_execution",
 		Tasks:          task.Tasks,
 		RepositoryName: task.RepositoryName,
-		WorkingDir:     task.WorkingDir,
-		Cmd:            task.Cmd,
-		Provider:       task.Provider,
+		WorkingDir:     workingDir,
 		Interactive:    task.Interactive,
-		Payload: map[string]interface{}{
-			"request_type": "task_execution",
-			"task_id":      task.ID,
-		},
-		Timestamp: time.Now(),
+		Cmd:            cmd,
+		ContinueTask:   false, // Default to false
+		Provider:       task.Provider,
 	}
 
 	if err := utils.PublishTask(taskMessage); err != nil {
