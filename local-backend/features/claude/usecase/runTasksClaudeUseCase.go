@@ -278,7 +278,7 @@ func (d *RunTasksClaudeUseCase) executeClaudeAdvanced(ctx context.Context, req *
 	args := []string{"--dangerously-skip-permissions", req.Tasks}
 
 	// 환경변수 또는 요청에서 Claude CLI 경로 확인
-	claudeCmd := req.ClaudeCmd
+	claudeCmd := req.Cmd
 	if claudeCmd == "" {
 		claudeCmd = os.Getenv("CLAUDE_CLI_PATH")
 		if claudeCmd == "" {
