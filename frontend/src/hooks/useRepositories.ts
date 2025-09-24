@@ -96,7 +96,7 @@ export function useRepositories(): UseRepositoriesReturn {
   });
 
   // Merge repository data with connection states
-  const repositories: Repository[] = (repositoriesData || []).map(repo => ({
+  const repositories: Repository[] = (repositoriesData || []).map((repo: any) => ({
     ...repo,
     is_connected: connectionStates[repo.id]?.is_connected || false,
     local_path: connectionStates[repo.id]?.local_path,

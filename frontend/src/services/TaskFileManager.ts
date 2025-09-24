@@ -1,5 +1,6 @@
 import { Task } from '../domain/entities/Task';
 import { WorkLogManager } from './WorkLogManager';
+import { apiConfig } from '../config/api';
 
 export interface TaskFileMetadata {
   id: string;
@@ -65,7 +66,7 @@ export class TaskFileManager {
       }
 
       // Load tasks from backend API with aggressive cache-busting
-      const response = await fetch('/api/epics/tasks?' + new URLSearchParams(queryParams), {
+      const response = await fetch(apiConfig.endpoints.tasks.list(repositoryName), {
         method: 'GET',
         cache: 'no-store',
         headers: {
@@ -110,10 +111,7 @@ export class TaskFileManager {
     };
 
     try {
-      // Prepare query parameters if repository is specified
-      const queryParams = repositoryName ? `?repository=${encodeURIComponent(repositoryName)}` : '';
-      
-      const response = await fetch('/api/epics/tasks' + queryParams, {
+      const response = await fetch(apiConfig.endpoints.tasks.create(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -165,10 +163,7 @@ export class TaskFileManager {
         content: content || existingTask.content,
       };
 
-      // Prepare query parameters if repository is specified
-      const queryParams = repositoryName ? `?repository=${encodeURIComponent(repositoryName)}` : '';
-      
-      const response = await fetch(`/api/epics/tasks/${taskId}` + queryParams, {
+      const response = await fetch(apiConfig.endpoints.tasks.update(taskId), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -230,8 +225,7 @@ export class TaskFileManager {
       }
 
       // Fetch from API
-      const queryParams = repositoryName ? `?repository=${encodeURIComponent(repositoryName)}` : '';
-      const response = await fetch(`/api/epics/tasks/${taskId}` + queryParams);
+      const response = await fetch(apiConfig.endpoints.tasks.get(taskId));
       if (!response.ok) {
         if (response.status === 404) {
           return null;

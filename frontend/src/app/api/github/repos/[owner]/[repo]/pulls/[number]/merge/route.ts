@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 interface MergeParams {
-  params: {
+  params: Promise<{
     owner: string;
     repo: string;
     number: string;
-  };
+  }>;
 }
 
 export async function PUT(request: NextRequest, { params }: MergeParams) {
   try {
-    const { owner, repo, number } = params;
+    const { owner, repo, number } = await params;
     const body = await request.json();
     
     // Get GitHub token from environment

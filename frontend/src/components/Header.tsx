@@ -62,7 +62,7 @@ export function Header({
             {/* Settings button */}
             {showSettings && (
               <Button variant="outline" size="sm">
-                {t('common.settings', 'Settings')}
+                {t('common.settings') || 'Settings'}
               </Button>
             )}
             
