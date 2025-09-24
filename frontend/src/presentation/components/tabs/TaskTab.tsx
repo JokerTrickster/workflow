@@ -237,7 +237,7 @@ Task created on ${new Date().toISOString()}`;
           body: JSON.stringify({
             tasks: taskData.description,
             repository_name: repository.name,
-            provider: 'claude',
+            provider: taskData.provider || 'claude',
             working_dir: taskData.branch_name || undefined,
             cmd: undefined,
             interactive: false

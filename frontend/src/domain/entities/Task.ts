@@ -10,6 +10,7 @@ export interface Task {
   completed_at?: string;
   branch_name?: string;
   pr_url?: string;
+  provider?: 'claude' | 'codex' | 'cursor';
   build_status?: 'pending' | 'success' | 'failed';
   lint_status?: 'pending' | 'success' | 'failed';
   ai_tokens_used?: number;
