@@ -42,14 +42,19 @@ func (uc *ExecuteTaskUseCase) ExecuteTask(requestID string) (*response.ExecuteTa
 		workingDir = *task.WorkingDir
 	}
 
+	cmd := ""
+	if task.Cmd != nil {
+		cmd = *task.Cmd
+	}
+
 	taskMessage := &utils.TaskMessage{
 		Tasks:          task.Tasks,
 		RepositoryName: task.RepositoryName,
 		WorkingDir:     workingDir,
-		Interactive:    false, // Default to false, can be made configurable
-		Cmd:            "",    // Default empty, can be made configurable
+		Interactive:    task.Interactive,
+		Cmd:            cmd,
 		ContinueTask:   false, // Default to false, can be made configurable
-		Provider:       "claude", // Default provider
+		Provider:       task.Provider,
 	}
 
 	// Send task to RabbitMQ queue for processing
