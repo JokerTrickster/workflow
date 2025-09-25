@@ -98,20 +98,15 @@ export function useClaude(): UseClaudeResult {
     setError(null);
 
     try {
-      const finalStatus = await claudeService.runTasksAndWait(
-        request,
+      // First submit the task
+      const submitResponse = await claudeService.runTasks(request);
+      setCurrentTask(submitResponse);
+
+      // Then poll for completion
+      const finalStatus = await claudeService.pollTaskStatus(
+        submitResponse.request_id,
         (status) => {
           setTaskStatus(status);
-          
-          // If this is the first status update, set the current task
-          if (!currentTask) {
-            setCurrentTask({
-              request_id: status.request_id,
-              status: status.status,
-              message: 'Task is being processed...',
-              created_at: status.created_at,
-            });
-          }
         }
       );
 
@@ -125,7 +120,7 @@ export function useClaude(): UseClaudeResult {
       setIsLoading(false);
       setIsPolling(false);
     }
-  }, [currentTask]);
+  }, []);
 
   return {
     // State

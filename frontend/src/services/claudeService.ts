@@ -159,6 +159,7 @@ export class ClaudeService {
 
   /**
    * Submit task and wait for completion with progress updates
+   * @deprecated Use runTasks() + pollTaskStatus() separately to avoid double API calls
    */
   async runTasksAndWait(
     request: ReqRunTasksClaude,
