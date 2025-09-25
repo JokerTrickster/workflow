@@ -17,6 +17,8 @@ type TaskWorker struct {
 	queueName    string
 	rabbitMQURL  string
 	providerFactory *AIProviderFactory
+	failureCount map[string]int  // Track failures per provider
+	maxRetries   int             // Maximum retry attempts before skipping
 }
 
 // TaskMessage matches the structure from backend
@@ -36,6 +38,8 @@ func NewTaskWorker(rabbitMQURL, queueName string) *TaskWorker {
 		rabbitMQURL:     rabbitMQURL,
 		queueName:       queueName,
 		providerFactory: GlobalAIProviderFactory,
+		failureCount:    make(map[string]int),
+		maxRetries:      5, // Skip after 5 consecutive failures
 	}
 }
 
@@ -144,14 +148,24 @@ func (w *TaskWorker) handleMessage(ctx context.Context, msg amqp.Delivery) {
 func (w *TaskWorker) executeTask(ctx context.Context, taskMsg *TaskMessage) error {
 	log.Printf("Executing task with provider: %s", taskMsg.Provider)
 
+	// Check failure count for this provider
+	if w.failureCount[taskMsg.Provider] >= w.maxRetries {
+		log.Printf("Provider %s has failed %d times consecutively, skipping task",
+			taskMsg.Provider, w.failureCount[taskMsg.Provider])
+		return fmt.Errorf("provider %s skipped due to too many consecutive failures (%d)",
+			taskMsg.Provider, w.failureCount[taskMsg.Provider])
+	}
+
 	// Get the appropriate provider
 	provider, exists := w.providerFactory.GetProvider(taskMsg.Provider)
 	if !exists {
+		w.failureCount[taskMsg.Provider]++
 		return fmt.Errorf("unknown provider: %s", taskMsg.Provider)
 	}
 
 	// Check if provider is configured
 	if !provider.IsConfigured() {
+		w.failureCount[taskMsg.Provider]++
 		return fmt.Errorf("provider %s is not properly configured", taskMsg.Provider)
 	}
 
@@ -173,6 +187,7 @@ func (w *TaskWorker) executeTask(ctx context.Context, taskMsg *TaskMessage) erro
 
 	response, err := provider.ExecuteTask(taskCtx, request)
 	if err != nil {
+		w.failureCount[taskMsg.Provider]++
 		return fmt.Errorf("provider %s failed to execute task: %w", taskMsg.Provider, err)
 	}
 
@@ -188,9 +203,12 @@ func (w *TaskWorker) executeTask(ctx context.Context, taskMsg *TaskMessage) erro
 	}
 
 	if !response.Success {
+		w.failureCount[taskMsg.Provider]++
 		return fmt.Errorf("task execution failed: %s", response.Error)
 	}
 
+	// Reset failure count on successful execution
+	w.failureCount[taskMsg.Provider] = 0
 	return nil
 }
 
@@ -208,4 +226,23 @@ func (w *TaskWorker) Close() error {
 // GetAvailableProviders returns list of configured providers
 func (w *TaskWorker) GetAvailableProviders() []string {
 	return w.providerFactory.GetAvailableProviders()
+}
+
+// ResetFailureCount resets the failure count for a specific provider
+func (w *TaskWorker) ResetFailureCount(provider string) {
+	w.failureCount[provider] = 0
+	log.Printf("Reset failure count for provider: %s", provider)
+}
+
+// ResetAllFailureCounts resets failure counts for all providers
+func (w *TaskWorker) ResetAllFailureCounts() {
+	for provider := range w.failureCount {
+		w.failureCount[provider] = 0
+	}
+	log.Println("Reset all provider failure counts")
+}
+
+// GetFailureCount returns the current failure count for a provider
+func (w *TaskWorker) GetFailureCount(provider string) int {
+	return w.failureCount[provider]
 }
