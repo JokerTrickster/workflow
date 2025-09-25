@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"main/features"
 	"main/utils"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	_ "main/docs"
 
@@ -21,17 +25,47 @@ import (
 // @host localhost:8080
 // @BasePath /
 func main() {
-	e := echo.New()
+	// Create context for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Setup signal handling for graceful shutdown
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	var wg sync.WaitGroup
 
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, continuing with environment variables")
 	}
+
 	// 서버 초기화
 	if err := utils.InitServer(); err != nil {
 		fmt.Printf("서버 초기화 에러 : %v", err.Error())
 		return
 	}
+
+	// Initialize Task Worker for RabbitMQ consumption
+	rabbitMQURL := os.Getenv("RABBITMQ_URL")
+	if rabbitMQURL == "" {
+		rabbitMQURL = "amqp://guest:guest@localhost:5672/"
+	}
+
+	queueName := os.Getenv("RABBITMQ_QUEUE_NAME")
+	if queueName == "" {
+		queueName = "claude_tasks"
+	}
+
+	// Start Task Worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		startTaskWorker(ctx, rabbitMQURL, queueName)
+	}()
+
+	// Setup Echo server
+	e := echo.New()
 
 	// Add middleware
 	e.Use(middleware.Logger())
@@ -58,10 +92,57 @@ func main() {
 		port = "8080"
 	}
 
-	// Start server
+	// Start HTTP server in goroutine
 	address := fmt.Sprintf("%s:%s", host, port)
-	log.Printf("Server starting on %s", address)
-	if err := e.Start(address); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		log.Printf("Server starting on %s", address)
+		if err := e.Start(address); err != nil {
+			log.Printf("Server stopped: %v", err)
+		}
+	}()
+
+	// Wait for signal
+	<-sigCh
+	log.Println("Received shutdown signal")
+
+	// Cancel context to stop all goroutines
+	cancel()
+
+	// Shutdown HTTP server
+	if err := e.Shutdown(context.Background()); err != nil {
+		log.Printf("Server shutdown error: %v", err)
+	}
+
+	// Wait for all goroutines to finish
+	wg.Wait()
+	log.Println("Application shutdown complete")
+}
+
+// startTaskWorker initializes and starts the RabbitMQ task worker
+func startTaskWorker(ctx context.Context, rabbitMQURL, queueName string) {
+	log.Printf("Starting Task Worker with RabbitMQ URL: %s, Queue: %s", rabbitMQURL, queueName)
+
+	// Create task worker
+	worker := utils.NewTaskWorker(rabbitMQURL, queueName)
+
+	// Connect to RabbitMQ
+	if err := worker.Connect(); err != nil {
+		log.Printf("Failed to connect to RabbitMQ: %v", err)
+		log.Println("Task Worker will not be available")
+		return
+	}
+	defer worker.Close()
+
+	log.Printf("Available AI providers: %v", worker.GetAvailableProviders())
+
+	// Start consuming messages
+	if err := worker.StartConsuming(ctx); err != nil {
+		if ctx.Err() != context.Canceled {
+			log.Printf("Task Worker error: %v", err)
+		} else {
+			log.Println("Task Worker stopped by context cancellation")
+		}
 	}
 }
