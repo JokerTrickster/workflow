@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -75,6 +76,11 @@ func (c *ClaudeProvider) ExecuteTask(ctx context.Context, request *AITaskRequest
 		if err != nil {
 			return nil, fmt.Errorf("failed to get current working directory: %w", err)
 		}
+	}
+
+	// Validate and create working directory if it doesn't exist
+	if err := c.ensureWorkingDirectory(workingDir); err != nil {
+		return nil, fmt.Errorf("failed to ensure working directory: %w", err)
 	}
 
 	// Build Claude CLI command
@@ -246,6 +252,33 @@ func (c *ClaudeProvider) GetClaudeVersion() (string, error) {
 		return "", fmt.Errorf("failed to get Claude version: %w", err)
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+// ensureWorkingDirectory creates the working directory if it doesn't exist
+func (c *ClaudeProvider) ensureWorkingDirectory(workingDir string) error {
+	// Check if directory exists
+	if _, err := os.Stat(workingDir); os.IsNotExist(err) {
+		log.Printf("Working directory %s does not exist, creating it", workingDir)
+		// Create directory with appropriate permissions
+		if err := os.MkdirAll(workingDir, 0755); err != nil {
+			return fmt.Errorf("failed to create working directory %s: %w", workingDir, err)
+		}
+		log.Printf("Created working directory: %s", workingDir)
+	} else if err != nil {
+		return fmt.Errorf("failed to check working directory %s: %w", workingDir, err)
+	} else {
+		// Directory exists, check if it's actually a directory
+		info, err := os.Stat(workingDir)
+		if err != nil {
+			return fmt.Errorf("failed to stat working directory %s: %w", workingDir, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("%s is not a directory", workingDir)
+		}
+		log.Printf("Working directory exists: %s", workingDir)
+	}
+
+	return nil
 }
 
 // ValidateClaudeConfig validates the Claude configuration

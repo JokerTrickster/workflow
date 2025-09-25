@@ -39,6 +39,15 @@ type TaskMessage struct {
 
 // NewTaskWorker creates a new task worker instance
 func NewTaskWorker(rabbitMQURL, queueName string) *TaskWorker {
+	// Safely get database connection
+	var db *gorm.DB
+	if mysql.GormMysqlDB != nil {
+		db = mysql.GormMysqlDB
+		log.Printf("TaskWorker: Database connection available")
+	} else {
+		log.Printf("TaskWorker: Database connection not available, failure logging will be disabled")
+	}
+
 	return &TaskWorker{
 		rabbitMQURL:     rabbitMQURL,
 		queueName:       queueName,
@@ -46,7 +55,7 @@ func NewTaskWorker(rabbitMQURL, queueName string) *TaskWorker {
 		failureCount:    make(map[string]int),
 		lastFailureTime: make(map[string]time.Time),
 		maxRetries:      5, // Skip after 5 consecutive failures
-		db:              mysql.GormMysqlDB,
+		db:              db,
 	}
 }
 
@@ -308,6 +317,12 @@ func (w *TaskWorker) GetFailureCountsReport() map[string]int {
 func (w *TaskWorker) recordTaskFailure(taskMsg *TaskMessage, errorMsg string) {
 	if w.db == nil {
 		log.Printf("Database connection not available, skipping failure record")
+		return
+	}
+
+	// Additional safety check for GORM DB instance
+	if w.db.Error != nil {
+		log.Printf("Database connection has error, skipping failure record: %v", w.db.Error)
 		return
 	}
 
