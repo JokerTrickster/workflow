@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"main/utils/db/mysql"
+	"strings"
 	"time"
 
 	"github.com/streadway/amqp"
+	"gorm.io/gorm"
 )
 
 // TaskWorker handles RabbitMQ message consumption and task execution
@@ -17,8 +20,10 @@ type TaskWorker struct {
 	queueName    string
 	rabbitMQURL  string
 	providerFactory *AIProviderFactory
-	failureCount map[string]int  // Track failures per provider
-	maxRetries   int             // Maximum retry attempts before skipping
+	failureCount map[string]int       // Track failures per provider
+	lastFailureTime map[string]time.Time // Track last failure time per provider
+	maxRetries   int                  // Maximum retry attempts before skipping
+	db           *gorm.DB             // Database connection for logging
 }
 
 // TaskMessage matches the structure from backend
@@ -39,7 +44,9 @@ func NewTaskWorker(rabbitMQURL, queueName string) *TaskWorker {
 		queueName:       queueName,
 		providerFactory: GlobalAIProviderFactory,
 		failureCount:    make(map[string]int),
+		lastFailureTime: make(map[string]time.Time),
 		maxRetries:      5, // Skip after 5 consecutive failures
+		db:              mysql.GormMysqlDB,
 	}
 }
 
@@ -135,7 +142,13 @@ func (w *TaskWorker) handleMessage(ctx context.Context, msg amqp.Delivery) {
 	err := w.executeTask(ctx, &taskMsg)
 	if err != nil {
 		log.Printf("Failed to execute task: %v", err)
-		msg.Nack(false, true) // Requeue for retry
+
+		// Record failure to database before acknowledging
+		w.recordTaskFailure(&taskMsg, err.Error())
+
+		// Always acknowledge to remove from queue, don't requeue failed tasks
+		msg.Ack(false)
+		log.Printf("Task failed and removed from queue (no retry) for provider: %s", taskMsg.Provider)
 		return
 	}
 
@@ -148,10 +161,21 @@ func (w *TaskWorker) handleMessage(ctx context.Context, msg amqp.Delivery) {
 func (w *TaskWorker) executeTask(ctx context.Context, taskMsg *TaskMessage) error {
 	log.Printf("Executing task with provider: %s", taskMsg.Provider)
 
+	// Check if enough time has passed to reset failure count (10 minutes)
+	if lastFailure, exists := w.lastFailureTime[taskMsg.Provider]; exists {
+		if time.Since(lastFailure) > 10*time.Minute {
+			log.Printf("Resetting failure count for provider %s due to time elapsed", taskMsg.Provider)
+			w.failureCount[taskMsg.Provider] = 0
+			delete(w.lastFailureTime, taskMsg.Provider)
+		}
+	}
+
 	// Check failure count for this provider
 	if w.failureCount[taskMsg.Provider] >= w.maxRetries {
 		log.Printf("Provider %s has failed %d times consecutively, skipping task",
 			taskMsg.Provider, w.failureCount[taskMsg.Provider])
+		// Record this as a skipped task
+		w.recordTaskFailure(taskMsg, fmt.Sprintf("provider %s skipped due to too many consecutive failures (%d)", taskMsg.Provider, w.failureCount[taskMsg.Provider]))
 		return fmt.Errorf("provider %s skipped due to too many consecutive failures (%d)",
 			taskMsg.Provider, w.failureCount[taskMsg.Provider])
 	}
@@ -165,7 +189,10 @@ func (w *TaskWorker) executeTask(ctx context.Context, taskMsg *TaskMessage) erro
 
 	// Check if provider is configured
 	if !provider.IsConfigured() {
-		w.failureCount[taskMsg.Provider]++
+		// Configuration errors should increment failure count more aggressively
+		w.failureCount[taskMsg.Provider] += 2 // Double increment for config issues
+		w.lastFailureTime[taskMsg.Provider] = time.Now()
+		log.Printf("Provider %s configuration issue (failure count: %d)", taskMsg.Provider, w.failureCount[taskMsg.Provider])
 		return fmt.Errorf("provider %s is not properly configured", taskMsg.Provider)
 	}
 
@@ -187,7 +214,23 @@ func (w *TaskWorker) executeTask(ctx context.Context, taskMsg *TaskMessage) erro
 
 	response, err := provider.ExecuteTask(taskCtx, request)
 	if err != nil {
-		w.failureCount[taskMsg.Provider]++
+		// Different error types get different failure count increments
+		if strings.Contains(err.Error(), "not properly configured") ||
+		   strings.Contains(err.Error(), "API key") ||
+		   strings.Contains(err.Error(), "authentication") {
+			// Configuration/auth errors: increment by 2
+			w.failureCount[taskMsg.Provider] += 2
+		} else if strings.Contains(err.Error(), "timeout") ||
+		         strings.Contains(err.Error(), "network") ||
+		         strings.Contains(err.Error(), "connection") {
+			// Network/timeout errors: increment by 1 (might be temporary)
+			w.failureCount[taskMsg.Provider]++
+		} else {
+			// Other errors: increment by 1
+			w.failureCount[taskMsg.Provider]++
+		}
+		w.lastFailureTime[taskMsg.Provider] = time.Now()
+		log.Printf("Provider %s execution error (failure count: %d): %v", taskMsg.Provider, w.failureCount[taskMsg.Provider], err)
 		return fmt.Errorf("provider %s failed to execute task: %w", taskMsg.Provider, err)
 	}
 
@@ -203,12 +246,17 @@ func (w *TaskWorker) executeTask(ctx context.Context, taskMsg *TaskMessage) erro
 	}
 
 	if !response.Success {
+		// Task failure: increment by 1 (might be task-specific)
 		w.failureCount[taskMsg.Provider]++
+		w.lastFailureTime[taskMsg.Provider] = time.Now()
+		log.Printf("Provider %s task failed (failure count: %d): %s", taskMsg.Provider, w.failureCount[taskMsg.Provider], response.Error)
 		return fmt.Errorf("task execution failed: %s", response.Error)
 	}
 
 	// Reset failure count on successful execution
 	w.failureCount[taskMsg.Provider] = 0
+	delete(w.lastFailureTime, taskMsg.Provider)
+	log.Printf("Provider %s task succeeded, failure count reset", taskMsg.Provider)
 	return nil
 }
 
@@ -254,4 +302,49 @@ func (w *TaskWorker) GetFailureCountsReport() map[string]int {
 		report[provider] = count
 	}
 	return report
+}
+
+// recordTaskFailure records task failure to database
+func (w *TaskWorker) recordTaskFailure(taskMsg *TaskMessage, errorMsg string) {
+	if w.db == nil {
+		log.Printf("Database connection not available, skipping failure record")
+		return
+	}
+
+	// Generate unique request ID for this failed task
+	requestID := mysql.PKIDGenerate()
+	now := time.Now()
+	processingTime := int64(0) // Minimal processing time for failed tasks
+
+	// Create workflow history record
+	history := mysql.WorkflowHistories{
+		RequestID:        requestID,
+		Status:          "failed",
+		Tasks:           taskMsg.Tasks,
+		RepositoryName:  taskMsg.RepositoryName,
+		Provider:        taskMsg.Provider,
+		Interactive:     taskMsg.Interactive,
+		ContinueTask:    taskMsg.ContinueTask,
+		CreatedAt:       now,
+		CompletedAt:     &now,
+		ProcessingTimeMs: &processingTime,
+	}
+
+	// Set optional fields if present
+	if taskMsg.WorkingDir != "" {
+		history.WorkingDir = &taskMsg.WorkingDir
+	}
+	if taskMsg.Cmd != "" {
+		history.Cmd = &taskMsg.Cmd
+	}
+	if errorMsg != "" {
+		history.Error = &errorMsg
+	}
+
+	// Insert to database
+	if err := w.db.Create(&history).Error; err != nil {
+		log.Printf("Failed to record task failure to database: %v", err)
+	} else {
+		log.Printf("Recorded task failure to database with request_id: %s", requestID)
+	}
 }
