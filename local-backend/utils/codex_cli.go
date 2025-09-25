@@ -269,8 +269,8 @@ func (c *CodexProvider) ValidateCodexConfig() error {
 	return nil
 }
 
-// init function registers the Codex provider
-func init() {
+// RegisterCodexProvider registers the Codex provider (call after loading env vars)
+func RegisterCodexProvider() {
 	codexProvider := NewCodexProvider()
 	GlobalAIProviderFactory.RegisterProvider("codex", codexProvider)
 }

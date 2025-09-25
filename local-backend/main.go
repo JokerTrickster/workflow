@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	_ "main/docs"
+	_ "main/utils" // Import utils package to trigger init() functions for AI providers
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
@@ -39,6 +40,11 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, continuing with environment variables")
 	}
+
+	// Register AI providers after loading environment variables
+	utils.RegisterClaudeProvider()
+	utils.RegisterCodexProvider()
+	utils.RegisterCursorProvider()
 
 	// 서버 초기화
 	if err := utils.InitServer(); err != nil {
@@ -136,6 +142,11 @@ func startTaskWorker(ctx context.Context, rabbitMQURL, queueName string) {
 	defer worker.Close()
 
 	log.Printf("Available AI providers: %v", worker.GetAvailableProviders())
+	log.Printf("Provider failure counts: %v", worker.GetFailureCountsReport())
+
+	// Reset failure counts on startup to allow fresh attempts
+	worker.ResetAllFailureCounts()
+	log.Println("Reset all provider failure counts on startup")
 
 	// Start consuming messages
 	if err := worker.StartConsuming(ctx); err != nil {

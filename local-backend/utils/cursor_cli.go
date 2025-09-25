@@ -12,18 +12,18 @@ import (
 
 // CursorProvider implements AIProvider interface for Cursor CLI
 type CursorProvider struct {
-	APIKey      string
-	CLIPath     string
-	WorkingDir  string
-	Timeout     time.Duration
+	APIKey     string
+	CLIPath    string
+	WorkingDir string
+	Timeout    time.Duration
 }
 
 // NewCursorProvider creates a new Cursor provider instance
 func NewCursorProvider() *CursorProvider {
 	return &CursorProvider{
-		APIKey:     os.Getenv("CURSOR_API_KEY"),
-		CLIPath:    "cursor",  // Assumes cursor CLI is in PATH
-		Timeout:    30 * time.Minute,
+		APIKey:  os.Getenv("CURSOR_API_KEY"),
+		CLIPath: "cursor", // Assumes cursor CLI is in PATH
+		Timeout: 30 * time.Minute,
 	}
 }
 
@@ -273,8 +273,8 @@ func (c *CursorProvider) ValidateCursorConfig() error {
 	return nil
 }
 
-// init function registers the Cursor provider
-func init() {
+// RegisterCursorProvider registers the Cursor provider (call after loading env vars)
+func RegisterCursorProvider() {
 	cursorProvider := NewCursorProvider()
 	GlobalAIProviderFactory.RegisterProvider("cursor", cursorProvider)
 }

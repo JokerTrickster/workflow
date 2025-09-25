@@ -246,3 +246,12 @@ func (w *TaskWorker) ResetAllFailureCounts() {
 func (w *TaskWorker) GetFailureCount(provider string) int {
 	return w.failureCount[provider]
 }
+
+// GetFailureCountsReport returns all failure counts for monitoring
+func (w *TaskWorker) GetFailureCountsReport() map[string]int {
+	report := make(map[string]int)
+	for provider, count := range w.failureCount {
+		report[provider] = count
+	}
+	return report
+}

@@ -20,8 +20,13 @@ type ClaudeProvider struct {
 
 // NewClaudeProvider creates a new Claude provider instance
 func NewClaudeProvider() *ClaudeProvider {
+	apiKey := os.Getenv("CLAUDE_API_KEY")
+	fmt.Printf("[DEBUG] Claude API Key length: %d\n", len(apiKey))
+	if apiKey == "" {
+		fmt.Println("[ERROR] CLAUDE_API_KEY environment variable is empty")
+	}
 	return &ClaudeProvider{
-		APIKey:     os.Getenv("CLAUDE_API_KEY"),
+		APIKey:     apiKey,
 		CLIPath:    "claude",  // Assumes claude CLI is in PATH
 		Timeout:    30 * time.Minute,
 	}
@@ -104,55 +109,29 @@ func (c *ClaudeProvider) ExecuteTask(ctx context.Context, request *AITaskRequest
 func (c *ClaudeProvider) buildClaudeCommand(request *AITaskRequest) []string {
 	args := []string{}
 
-	// Basic claude command
-	if request.Interactive {
-		args = append(args, "--interactive")
+	// For non-interactive mode, use --print flag
+	if !request.Interactive {
+		args = append(args, "--print")
 	}
 
-	// Add task content
-	if request.Tasks != "" {
-		args = append(args, "--message", request.Tasks)
-	}
+	// Add task content as the prompt (last argument)
+	prompt := request.Tasks
 
-	// Add working directory if specified
-	if request.WorkingDir != "" {
-		args = append(args, "--working-dir", request.WorkingDir)
-	}
-
-	// Add repository context if available
+	// Enhance prompt with context information
 	if request.RepositoryName != "" {
-		args = append(args, "--context", fmt.Sprintf("repository:%s", request.RepositoryName))
+		prompt = fmt.Sprintf("Repository: %s\n\n%s", request.RepositoryName, prompt)
 	}
 
-	// Add continue task flag if needed
-	if request.ContinueTask {
-		args = append(args, "--continue")
-	}
-
-	// Add custom command if specified
 	if request.Cmd != "" {
-		args = append(args, "--execute", request.Cmd)
+		prompt = fmt.Sprintf("%s\n\nAdditional command to consider: %s", prompt, request.Cmd)
 	}
 
-	// Add provider-specific options
-	if options, ok := request.Options["claude"].(map[string]interface{}); ok {
-		for key, value := range options {
-			switch key {
-			case "model":
-				if model, ok := value.(string); ok {
-					args = append(args, "--model", model)
-				}
-			case "temperature":
-				if temp, ok := value.(float64); ok {
-					args = append(args, "--temperature", fmt.Sprintf("%.2f", temp))
-				}
-			case "max_tokens":
-				if tokens, ok := value.(int); ok {
-					args = append(args, "--max-tokens", fmt.Sprintf("%d", tokens))
-				}
-			}
-		}
+	if request.ContinueTask {
+		prompt = fmt.Sprintf("%s\n\nNote: This is a continuation of a previous task.", prompt)
 	}
+
+	// Add the final prompt as the last argument
+	args = append(args, prompt)
 
 	return args
 }
@@ -176,6 +155,12 @@ func (c *ClaudeProvider) executeCommand(ctx context.Context, args []string, work
 		fmt.Sprintf("CLAUDE_API_KEY=%s", c.APIKey),
 	)
 
+	// Debug logging
+	fmt.Printf("[DEBUG] Executing Claude CLI command:\n")
+	fmt.Printf("[DEBUG] Command: %s %s\n", c.CLIPath, strings.Join(args, " "))
+	fmt.Printf("[DEBUG] Working directory: %s\n", workingDir)
+	fmt.Printf("[DEBUG] API Key present: %t (length: %d)\n", len(c.APIKey) > 0, len(c.APIKey))
+
 	// Execute command and capture output
 	output, err := cmd.CombinedOutput()
 	result := &CommandResult{
@@ -185,11 +170,16 @@ func (c *ClaudeProvider) executeCommand(ctx context.Context, args []string, work
 
 	if err != nil {
 		result.Error = err.Error()
+		fmt.Printf("[DEBUG] Command failed with error: %v\n", err)
+		fmt.Printf("[DEBUG] Command output: %s\n", string(output))
 
 		// Check for specific error types
 		if ctx.Err() == context.DeadlineExceeded {
 			result.Error = "command execution timeout"
 		}
+	} else {
+		fmt.Printf("[DEBUG] Command succeeded\n")
+		fmt.Printf("[DEBUG] Command output: %s\n", string(output))
 	}
 
 	// Try to parse tokens used from output if available
@@ -273,8 +263,10 @@ func (c *ClaudeProvider) ValidateClaudeConfig() error {
 	return nil
 }
 
-// init function registers the Claude provider
-func init() {
+// RegisterClaudeProvider registers the Claude provider (call after loading env vars)
+func RegisterClaudeProvider() {
+	fmt.Println("[DEBUG] Registering Claude provider")
 	claudeProvider := NewClaudeProvider()
 	GlobalAIProviderFactory.RegisterProvider("claude", claudeProvider)
+	fmt.Printf("[DEBUG] Claude provider registered, configured: %t\n", claudeProvider.IsConfigured())
 }
