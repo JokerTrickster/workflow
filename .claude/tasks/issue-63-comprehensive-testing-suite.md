@@ -1,0 +1,230 @@
+---
+github: "https://github.com/JokerTrickster/workflow/issues/63"
+last_sync: "2025-09-26T17:16:15.421745Z"
+status: completed
+
+---
+
+
+# Task 008: Comprehensive Testing Suite
+
+## Overview
+
+Develop a complete testing suite covering all application layers with 90%+ code coverage goal. Includes unit tests for business logic, integration tests for external services, end-to-end tests with mock dependencies, and specialized table-driven tests for message routing scenarios.
+
+## Acceptance Criteria
+
+- [ ] Unit tests for all layers achieving 90%+ code coverage
+- [ ] Integration tests for external services (RabbitMQ, Claude API, SQLite)
+- [ ] End-to-end tests with mock dependencies and realistic test scenarios
+- [ ] Table-driven tests for comprehensive message routing validation
+- [ ] Performance benchmarks for critical path operations
+
+## Technical Requirements
+
+### Unit Test Coverage
+- Domain layer: Business logic, entity validation, and rules
+- Application layer: Service implementations and workflows
+- Infrastructure layer: Repository patterns and external adapters
+- Configuration layer: Settings validation and error handling
+
+### Integration Testing
+```go
+// Database integration tests
+func TestSQLiteRepository_Integration(t *testing.T) {
+    db := setupTestDatabase()
+    defer cleanupTestDatabase(db)
+    
+    repo := NewSQLiteRepository(db)
+    // Test actual database operations
+}
+
+// RabbitMQ integration tests
+func TestRabbitMQConsumer_Integration(t *testing.T) {
+    conn := setupTestRabbitMQ()
+    defer cleanupTestRabbitMQ(conn)
+    
+    consumer := NewRabbitMQConsumer(conn)
+    // Test actual message consumption
+}
+```
+
+### End-to-End Testing Framework
+- Test environment setup with Docker containers
+- Mock Claude API server for reliable testing
+- Realistic message payloads and processing scenarios
+- Request lifecycle validation from queue to database
+
+### Table-Driven Test Scenarios
+```go
+func TestMessageRouting(t *testing.T) {
+    testCases := []struct {
+        name           string
+        messageType    string
+        payload        map[string]interface{}
+        expectedStatus RequestStatus
+        expectedError  error
+    }{
+        {
+            name:           "Valid Work Request",
+            messageType:    "work_request",
+            payload:        validWorkRequestPayload,
+            expectedStatus: StatusProcessing,
+            expectedError:  nil,
+        },
+        {
+            name:           "Invalid Message Format",
+            messageType:    "malformed",
+            payload:        invalidPayload,
+            expectedStatus: StatusFailed,
+            expectedError:  ErrInvalidMessageFormat,
+        },
+        // Additional test cases for all message types
+    }
+    
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            // Test execution logic
+        })
+    }
+}
+```
+
+## Implementation Details
+
+### Test Structure Organization
+```
+tests/
+├── unit/
+│   ├── domain/          # Business logic tests
+│   ├── application/     # Service layer tests
+│   └── infrastructure/  # Repository and adapter tests
+├── integration/
+│   ├── database/        # SQLite integration tests
+│   ├── queue/          # RabbitMQ integration tests
+│   └── api/            # Claude API integration tests
+├── e2e/
+│   ├── scenarios/      # Full workflow tests
+│   └── performance/    # Benchmark tests
+├── fixtures/
+│   ├── messages/       # Test message payloads
+│   └── responses/      # Mock API responses
+└── testutil/
+    ├── database.go     # Test database utilities
+    ├── queue.go        # Test queue utilities
+    └── mocks.go        # Mock implementations
+```
+
+### Mock Implementations
+- Mock Claude API client with configurable responses
+- Mock RabbitMQ consumer for isolated unit testing
+- Mock database repository for service layer testing
+- Test doubles for all external dependencies
+
+### Performance Benchmarking
+```go
+func BenchmarkMessageProcessing(b *testing.B) {
+    processor := setupTestProcessor()
+    message := createTestMessage()
+    
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        processor.ProcessMessage(message)
+    }
+}
+
+// Target benchmarks
+// - Message processing latency < 100ms
+// - Database operations < 10ms
+// - Memory usage < 50MB during processing
+```
+
+### Test Data Management
+- Fixture files for various message types and scenarios
+- Database migration scripts for test environments
+- Seed data for realistic integration testing
+- Test cleanup utilities to prevent test pollution
+
+## Testing Strategy
+
+### Unit Testing Approach
+- Isolated testing with dependency injection
+- Mock external dependencies completely
+- Focus on business logic correctness
+- Edge case and error condition coverage
+
+### Integration Testing Approach
+- Real external service connections in controlled environment
+- Docker containers for consistent test environments
+- Transaction rollback for database test isolation
+- Network simulation for connection failure scenarios
+
+### End-to-End Testing Approach
+- Full application stack with test configuration
+- Realistic message flows and processing scenarios
+- Error recovery and failure handling validation
+- Performance characteristics under load
+
+### Continuous Testing Pipeline
+```yaml
+# GitHub Actions workflow for testing
+test_matrix:
+  - go_version: ["1.21", "1.22"]
+    database: ["sqlite"]
+    queue: ["rabbitmq:3.12"]
+
+test_stages:
+  - unit_tests: "go test ./... -short"
+  - integration_tests: "go test ./... -tags=integration"
+  - e2e_tests: "go test ./tests/e2e/..."
+  - coverage_report: "go test -coverprofile=coverage.out"
+```
+
+## Dependencies & Blockers
+
+### External Dependencies
+- testify/assert and testify/mock for testing framework
+- Docker for integration test environment
+- golangci-lint for code quality validation
+
+### Internal Dependencies
+- Task 006: Application services must be implemented
+- Task 007: Configuration and error handling must be complete
+- All infrastructure layers must be functional
+
+### Potential Blockers
+- Docker environment setup complexity
+- Mock service behavior accuracy
+- Test data generation and management
+- Performance benchmark environment consistency
+
+## Definition of Done
+
+- [ ] 90%+ code coverage across all application layers
+- [ ] All unit tests passing with comprehensive business logic coverage
+- [ ] Integration tests validating external service interactions
+- [ ] End-to-end tests covering complete message processing workflows
+- [ ] Table-driven tests for all message routing scenarios
+- [ ] Performance benchmarks meeting specified latency requirements
+- [ ] Automated test execution in CI/CD pipeline
+- [ ] Test documentation with setup instructions and troubleshooting
+
+## Estimated Effort: L (24 hours)
+
+### Time Breakdown
+- Unit test development (all layers): 8 hours
+- Integration test implementation: 6 hours
+- End-to-end test scenarios: 4 hours
+- Table-driven message routing tests: 3 hours
+- Performance benchmarking setup: 2 hours
+- Test infrastructure and CI/CD integration: 1 hour
+
+### Critical Path
+1. Establish testing framework and project structure
+2. Implement comprehensive unit tests for all layers
+3. Develop integration tests for external services
+4. Create end-to-end test scenarios with realistic workflows
+5. Build table-driven tests for message routing validation
+6. Set up performance benchmarks and measurement
+7. Integrate automated testing into development workflow
+8. Document testing procedures and troubleshooting guides

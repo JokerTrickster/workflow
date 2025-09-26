@@ -1,0 +1,48 @@
+---
+github: "https://github.com/JokerTrickster/workflow/issues/54"
+last_sync: "2025-09-26T17:16:16.770705Z"
+status: open
+
+---
+
+
+# Task: Use Cases and Business Logic
+
+## Description
+Implement the application service layer containing all business use cases for task management. This includes task creation, deletion, resumption, querying, and execution orchestration services with comprehensive business logic and validation.
+
+## Acceptance Criteria
+- [ ] TaskService implemented with CRUD operations
+- [ ] Task creation use case with validation and business rules
+- [ ] Task deletion use case with cleanup logic
+- [ ] Task resume use case for failed/cancelled tasks
+- [ ] Task query use case with filtering and pagination
+- [ ] Task execution orchestration service
+- [ ] Business logic for task state transitions
+- [ ] Error handling for all business scenarios
+
+## Technical Details
+- Create `internal/usecase/` package structure
+- Implement TaskService in `internal/usecase/task_service.go`
+- Create ExecutionService in `internal/usecase/execution_service.go`
+- Implement QueryService in `internal/usecase/query_service.go`
+- Define service interfaces and dependency injection
+- Implement transaction management for complex operations
+- Add logging and monitoring hooks for business operations
+
+## Dependencies
+- [ ] Task 004: Domain Layer Implementation (domain entities and interfaces)
+- [ ] Repository interfaces defined
+- [ ] Domain validation rules available
+
+## Effort Estimate
+- Size: L
+- Hours: 6-8 hours
+- Parallel: false
+
+## Definition of Done
+- [ ] All use cases implemented with proper error handling
+- [ ] Business logic tests written covering happy path and edge cases
+- [ ] Service layer integration tests with mock repositories
+- [ ] Business rules documented and validated
+- [ ] Code reviewed for business logic correctness and maintainability

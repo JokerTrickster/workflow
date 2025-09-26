@@ -1,0 +1,44 @@
+---
+github: "https://github.com/JokerTrickster/workflow/issues/70"
+last_sync: "2025-09-26T17:16:16.991535Z"
+status: open
+
+---
+
+
+# Task: Queue-Database Atomic Integration
+
+## Description
+Modify the existing backend queue insertion logic to persist workflow tasks to the database atomically. When a task is successfully queued to RabbitMQ, it must also be inserted into the `workflow_histories` table. If either operation fails, both operations must be rolled back completely.
+
+## Acceptance Criteria
+- [ ] Task queuing and database insertion happen atomically (both succeed or both fail)
+- [ ] Generate unique `request_id` for each task using UUID v4
+- [ ] Store all required task metadata in `workflow_histories` table
+- [ ] Initialize tasks with `pending` status
+- [ ] Implement proper transaction rollback on any failure
+- [ ] Preserve existing queue functionality without breaking changes
+
+## Technical Details
+- **Files to modify**: `backend/` queue handler logic
+- **Database**: Use existing GORM `WorkflowHistories` model
+- **Transaction pattern**: Use GORM's `db.Transaction()` for atomic operations
+- **Error handling**: Return proper error responses if database insertion fails
+- **UUID generation**: Use Go's `uuid` package for unique request IDs
+
+## Dependencies
+- [ ] Existing RabbitMQ queue system operational
+- [ ] `workflow_histories` table exists in database
+- [ ] GORM WorkflowHistories model available
+
+## Effort Estimate
+- Size: M
+- Hours: 12
+- Parallel: false (foundation for other tasks)
+
+## Definition of Done
+- [ ] Code implemented with atomic queue + database operations
+- [ ] Unit tests written for transaction success and failure scenarios
+- [ ] Integration test validates complete rollback on failures
+- [ ] Error logging implemented for debugging
+- [ ] No existing queue functionality broken

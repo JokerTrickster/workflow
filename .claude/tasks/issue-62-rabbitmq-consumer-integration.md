@@ -1,0 +1,61 @@
+---
+github: "https://github.com/JokerTrickster/workflow/issues/62"
+last_sync: "2025-09-26T17:16:15.812988Z"
+status: completed
+
+---
+
+
+# RabbitMQ Consumer Integration
+
+## Overview
+Implement a robust RabbitMQ consumer service that handles incoming workflow messages, manages connections with automatic reconnection, and routes messages to appropriate processors.
+
+## Acceptance Criteria
+- [ ] Consumer connects to RabbitMQ with proper connection management
+- [ ] Automatic reconnection logic handles network failures and broker restarts
+- [ ] JSON message parsing validates structure and handles malformed messages
+- [ ] Message routing directs different message types to appropriate handlers
+- [ ] Consumer acknowledges messages after successful processing and rejects on failure
+
+## Technical Details
+
+### Implementation Approach
+- Create `MessageConsumer` struct with connection pooling
+- Implement exponential backoff for reconnection attempts
+- Use structured logging for connection events and message processing
+- Handle different message types: workflow_start, workflow_update, workflow_complete
+- Implement dead letter queue for failed messages
+
+### Key Components
+```go
+type MessageConsumer struct {
+    conn       *amqp.Connection
+    channel    *amqp.Channel
+    queue      string
+    processor  MessageProcessor
+    logger     *logrus.Logger
+}
+
+type WorkflowMessage struct {
+    Type      string                 `json:"type"`
+    ID        string                 `json:"id"`
+    Payload   map[string]interface{} `json:"payload"`
+    Timestamp time.Time              `json:"timestamp"`
+}
+```
+
+### Configuration
+- Connection URL from environment
+- Queue names and routing keys
+- Retry policies and timeouts
+- Consumer prefetch settings
+
+## Definition of Done
+- [ ] MessageConsumer service connects to RabbitMQ successfully
+- [ ] Connection recovery handles broker restarts without message loss
+- [ ] JSON parsing validates message structure with proper error handling
+- [ ] Message routing correctly dispatches to workflow processors
+- [ ] Unit tests cover connection management and message processing scenarios
+- [ ] Integration tests verify end-to-end message flow
+- [ ] Monitoring and logging provide visibility into consumer health

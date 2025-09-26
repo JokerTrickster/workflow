@@ -1,0 +1,49 @@
+---
+github: "https://github.com/JokerTrickster/workflow/issues/74"
+last_sync: "2025-09-26T17:16:17.402971Z"
+status: open
+
+---
+
+
+# Task: Frontend API Integration
+
+## Description
+Update the frontend application to consume the task history API and display repository-specific workflow history. Integrate with existing repository management system and implement pagination controls for task browsing.
+
+## Acceptance Criteria
+- [ ] Extend existing API client to call task history endpoint
+- [ ] Create UI component for displaying task history list
+- [ ] Implement pagination controls (previous/next, page numbers)
+- [ ] Show task status with appropriate visual indicators
+- [ ] Filter tasks by current repository automatically
+- [ ] Handle API errors gracefully with user-friendly messages
+- [ ] Add loading states during API calls
+- [ ] Use existing polling patterns for status updates
+
+## Technical Details
+- **Files to modify**: Frontend API client, repository management components
+- **UI components**: Task history list, pagination controls, status indicators
+- **State management**: Integrate with existing repository state
+- **Error handling**: User-friendly error messages and fallbacks
+- **Performance**: Efficient pagination and data caching
+- **Polling**: Leverage existing patterns for real-time updates
+
+## Dependencies
+- [ ] Task 003 completed (API endpoint functional)
+- [ ] Existing frontend repository management system
+- [ ] Frontend API client infrastructure
+
+## Effort Estimate
+- Size: M
+- Hours: 10
+- Parallel: true (can work after Task 003)
+
+## Definition of Done
+- [ ] Task history displayed for current repository
+- [ ] Pagination controls functional
+- [ ] Status indicators clear and intuitive
+- [ ] Error handling provides good user experience
+- [ ] Loading states implemented
+- [ ] Integration tested with backend API
+- [ ] UI follows existing design patterns
