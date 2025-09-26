@@ -8,6 +8,7 @@ import (
 	"main/utils"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 
@@ -63,11 +64,19 @@ func main() {
 		queueName = "claude_tasks"
 	}
 
-	// Start Task Worker
+	// Get max concurrent workers from environment (default 3)
+	maxConcurrent := 3
+	if concurrentStr := os.Getenv("MAX_CONCURRENT_TASKS"); concurrentStr != "" {
+		if parsed, err := strconv.Atoi(concurrentStr); err == nil && parsed > 0 {
+			maxConcurrent = parsed
+		}
+	}
+
+	// Start Concurrent Task Worker
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		startTaskWorker(ctx, rabbitMQURL, queueName)
+		startConcurrentTaskWorker(ctx, rabbitMQURL, queueName, maxConcurrent)
 	}()
 
 	// Setup Echo server
@@ -126,17 +135,17 @@ func main() {
 	log.Println("Application shutdown complete")
 }
 
-// startTaskWorker initializes and starts the RabbitMQ task worker
-func startTaskWorker(ctx context.Context, rabbitMQURL, queueName string) {
-	log.Printf("Starting Task Worker with RabbitMQ URL: %s, Queue: %s", rabbitMQURL, queueName)
+// startConcurrentTaskWorker initializes and starts the concurrent RabbitMQ task worker
+func startConcurrentTaskWorker(ctx context.Context, rabbitMQURL, queueName string, maxConcurrent int) {
+	log.Printf("Starting Concurrent Task Worker with RabbitMQ URL: %s, Queue: %s, Max Concurrent: %d", rabbitMQURL, queueName, maxConcurrent)
 
-	// Create task worker
-	worker := utils.NewTaskWorker(rabbitMQURL, queueName)
+	// Create concurrent task worker
+	worker := utils.NewConcurrentTaskWorker(rabbitMQURL, queueName, maxConcurrent)
 
 	// Connect to RabbitMQ
 	if err := worker.Connect(); err != nil {
 		log.Printf("Failed to connect to RabbitMQ: %v", err)
-		log.Println("Task Worker will not be available")
+		log.Println("Concurrent Task Worker will not be available")
 		return
 	}
 	defer worker.Close()
@@ -148,12 +157,18 @@ func startTaskWorker(ctx context.Context, rabbitMQURL, queueName string) {
 	worker.ResetAllFailureCounts()
 	log.Println("Reset all provider failure counts on startup")
 
-	// Start consuming messages
+	// Start consuming messages concurrently
 	if err := worker.StartConsuming(ctx); err != nil {
 		if ctx.Err() != context.Canceled {
-			log.Printf("Task Worker error: %v", err)
+			log.Printf("Concurrent Task Worker error: %v", err)
 		} else {
-			log.Println("Task Worker stopped by context cancellation")
+			log.Println("Concurrent Task Worker stopped by context cancellation")
 		}
 	}
+}
+
+// Legacy function kept for backward compatibility
+func startTaskWorker(ctx context.Context, rabbitMQURL, queueName string) {
+	// Default to 1 concurrent task for backward compatibility
+	startConcurrentTaskWorker(ctx, rabbitMQURL, queueName, 1)
 }
