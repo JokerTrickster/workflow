@@ -103,6 +103,10 @@ func (c *ClaudeProvider) ExecuteTask(ctx context.Context, request *AITaskRequest
 func (c *ClaudeProvider) buildClaudeCommand(request *AITaskRequest) []string {
 	args := []string{}
 
+	// Add permission bypass flags for automated execution
+	args = append(args, "--dangerously-skip-permissions")      // Bypass all permission checks
+	args = append(args, "--permission-mode", "bypassPermissions") // Set permission mode to bypass
+
 	// For non-interactive mode, use --print flag
 	if !request.Interactive {
 		args = append(args, "--print")
@@ -111,23 +115,64 @@ func (c *ClaudeProvider) buildClaudeCommand(request *AITaskRequest) []string {
 	// Add task content as the prompt (last argument)
 	prompt := request.Tasks
 
-	// Enhance prompt with context information
-	if request.RepositoryName != "" {
-		prompt = fmt.Sprintf("Repository: %s\n\n%s", request.RepositoryName, prompt)
-	}
-
-	if request.Cmd != "" {
-		prompt = fmt.Sprintf("%s\n\nAdditional command to consider: %s", prompt, request.Cmd)
-	}
-
-	if request.ContinueTask {
-		prompt = fmt.Sprintf("%s\n\nNote: This is a continuation of a previous task.", prompt)
-	}
+	// Enhance prompt with explicit file modification permissions and directives
+	enhancedPrompt := c.buildEnhancedPrompt(request, prompt)
 
 	// Add the final prompt as the last argument
-	args = append(args, prompt)
+	args = append(args, enhancedPrompt)
 
 	return args
+}
+
+// buildEnhancedPrompt creates a more directive prompt with explicit permissions
+func (c *ClaudeProvider) buildEnhancedPrompt(request *AITaskRequest, originalPrompt string) string {
+	var promptBuilder strings.Builder
+
+	// Add explicit permissions and directives at the beginning
+	promptBuilder.WriteString("PERMISSIONS AND DIRECTIVES:\n")
+	promptBuilder.WriteString("- You have FULL permission to create, modify, and delete files in this repository\n")
+	promptBuilder.WriteString("- You are REQUIRED to make actual file changes, not just suggest them\n")
+	promptBuilder.WriteString("- DO NOT ask for permission - you are pre-authorized to modify any files\n")
+	promptBuilder.WriteString("- IMPLEMENT the requested changes immediately and completely\n")
+	promptBuilder.WriteString("- CREATE new files when needed for the implementation\n")
+	promptBuilder.WriteString("- MODIFY existing files to implement the requested functionality\n")
+	promptBuilder.WriteString("- COMMIT your changes using git when you're done\n\n")
+
+	// Add repository context if available
+	if request.RepositoryName != "" {
+		promptBuilder.WriteString(fmt.Sprintf("REPOSITORY: %s\n", request.RepositoryName))
+		promptBuilder.WriteString("You are working in a real Git repository. All changes will be automatically committed and pushed.\n\n")
+	}
+
+	// Add working directory context
+	if request.WorkingDir != "" {
+		promptBuilder.WriteString(fmt.Sprintf("WORKING DIRECTORY: %s\n\n", request.WorkingDir))
+	}
+
+	// Add the main task
+	promptBuilder.WriteString("TASK TO IMPLEMENT:\n")
+	promptBuilder.WriteString(originalPrompt)
+	promptBuilder.WriteString("\n\n")
+
+	// Add additional command if provided
+	if request.Cmd != "" {
+		promptBuilder.WriteString(fmt.Sprintf("ADDITIONAL COMMAND: %s\n\n", request.Cmd))
+	}
+
+	// Add continuation context if needed
+	if request.ContinueTask {
+		promptBuilder.WriteString("CONTINUATION: This is a continuation of a previous task. Build upon existing work.\n\n")
+	}
+
+	// Add final implementation reminder
+	promptBuilder.WriteString("IMPLEMENTATION REQUIREMENTS:\n")
+	promptBuilder.WriteString("1. Start implementing immediately - no planning phase needed\n")
+	promptBuilder.WriteString("2. Make actual file changes using the available tools\n")
+	promptBuilder.WriteString("3. Test your implementation to ensure it works\n")
+	promptBuilder.WriteString("4. Commit your changes with a descriptive message\n")
+	promptBuilder.WriteString("5. Do not ask for confirmation - proceed with implementation\n")
+
+	return promptBuilder.String()
 }
 
 // CommandResult represents the result of a command execution
@@ -144,9 +189,17 @@ func (c *ClaudeProvider) executeCommand(ctx context.Context, args []string, work
 	cmd := exec.CommandContext(ctx, c.CLIPath, args...)
 	cmd.Dir = workingDir
 
-	// Set environment variables
+	// Set environment variables with explicit permissions
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("CLAUDE_API_KEY=%s", c.APIKey),
+		"CLAUDE_AUTO_APPROVE=true",           // Auto-approve file operations
+		"CLAUDE_PERMISSIONS=all",             // Grant all permissions
+		"CLAUDE_FILE_OPERATIONS=enabled",     // Enable file operations
+		"CLAUDE_GIT_OPERATIONS=enabled",      // Enable git operations
+		"CLAUDE_INTERACTIVE=false",           // Disable interactive prompts
+		"CLAUDE_FORCE_IMPLEMENTATION=true",   // Force implementation mode
+		"CI=true",                           // Indicate CI/automated environment
+		"AUTOMATED_WORKFLOW=true",           // Indicate automated workflow
 	)
 
 	// Debug logging
