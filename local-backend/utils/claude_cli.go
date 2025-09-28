@@ -242,7 +242,7 @@ func (c *ClaudeProvider) GetClaudeVersion() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// prepareRepositoryWorkspace clones repository and creates working branch
+// prepareRepositoryWorkspace uses existing local repository and creates working branch
 func (c *ClaudeProvider) prepareRepositoryWorkspace(ctx context.Context, request *AITaskRequest) (string, error) {
 	// If no repository name, use fallback directory logic
 	if request.RepositoryName == "" {
@@ -260,28 +260,87 @@ func (c *ClaudeProvider) prepareRepositoryWorkspace(ctx context.Context, request
 		return workingDir, c.ensureWorkingDirectory(workingDir)
 	}
 
-	// Create a unique workspace for this task
-	timestamp := time.Now().Unix()
-	workspaceDir := fmt.Sprintf("/tmp/claude-workspace-%s-%d", request.RepositoryName, timestamp)
+	// Use existing local repository
+	baseDir := "/Users/mac/project/git-repository/JokerTrickster"
+	repositoryDir := filepath.Join(baseDir, request.RepositoryName)
 
-	log.Printf("Creating workspace for repository %s at %s", request.RepositoryName, workspaceDir)
+	log.Printf("Using existing repository for %s at %s", request.RepositoryName, repositoryDir)
 
-	// Clone the repository
-	if err := c.cloneRepository(ctx, request.RepositoryName, workspaceDir); err != nil {
-		return "", fmt.Errorf("failed to clone repository: %w", err)
+	// Validate repository exists and is a Git repository
+	if err := c.validateExistingRepository(repositoryDir); err != nil {
+		return "", fmt.Errorf("repository validation failed: %w", err)
+	}
+
+	// Ensure repository is up to date
+	if err := c.updateRepository(ctx, repositoryDir); err != nil {
+		log.Printf("Warning: failed to update repository: %v", err)
+		// Continue with current state if update fails
 	}
 
 	// Create and checkout a working branch
+	timestamp := time.Now().Unix()
 	branchName := fmt.Sprintf("claude-task-%d", timestamp)
-	if err := c.createWorkingBranch(ctx, workspaceDir, branchName); err != nil {
+	if err := c.createWorkingBranch(ctx, repositoryDir, branchName); err != nil {
 		log.Printf("Warning: failed to create branch %s: %v", branchName, err)
-		// Continue with main branch if branch creation fails
+		// Continue with current branch if branch creation fails
 	}
 
-	return workspaceDir, nil
+	return repositoryDir, nil
 }
 
-// cloneRepository clones a GitHub repository
+// validateExistingRepository validates that a local repository exists and is valid
+func (c *ClaudeProvider) validateExistingRepository(repositoryDir string) error {
+	// Check if directory exists
+	if _, err := os.Stat(repositoryDir); os.IsNotExist(err) {
+		return fmt.Errorf("repository directory does not exist: %s", repositoryDir)
+	}
+
+	// Check if it's a Git repository
+	gitDir := filepath.Join(repositoryDir, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		return fmt.Errorf("directory is not a Git repository: %s", repositoryDir)
+	}
+
+	log.Printf("Repository validation successful: %s", repositoryDir)
+	return nil
+}
+
+// updateRepository updates the repository to latest state
+func (c *ClaudeProvider) updateRepository(ctx context.Context, repositoryDir string) error {
+	log.Printf("Updating repository: %s", repositoryDir)
+
+	// Stash any local changes to avoid conflicts
+	cmd := exec.CommandContext(ctx, "git", "stash")
+	cmd.Dir = repositoryDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("Git stash failed (might be no changes): %v\nOutput: %s", err, string(output))
+	}
+
+	// Checkout main/master branch
+	for _, branch := range []string{"main", "master"} {
+		cmd = exec.CommandContext(ctx, "git", "checkout", branch)
+		cmd.Dir = repositoryDir
+		if _, err := cmd.CombinedOutput(); err == nil {
+			log.Printf("Switched to branch: %s", branch)
+			break
+		} else {
+			log.Printf("Failed to checkout %s: %v", branch, err)
+		}
+	}
+
+	// Pull latest changes
+	cmd = exec.CommandContext(ctx, "git", "pull")
+	cmd.Dir = repositoryDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("Git pull failed: %v\nOutput: %s", err, string(output))
+		return err
+	}
+
+	log.Printf("Repository updated successfully: %s", repositoryDir)
+	return nil
+}
+
+// cloneRepository clones a GitHub repository (kept for backward compatibility)
 func (c *ClaudeProvider) cloneRepository(ctx context.Context, repositoryName, targetDir string) error {
 	githubURL := fmt.Sprintf("https://github.com/%s.git", repositoryName)
 

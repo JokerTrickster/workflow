@@ -125,3 +125,70 @@ type WorkflowHistories struct {
 - Task completes → Update completed_at, processing_time_ms, result/error, status
 
 This system provides full traceability of task executions while keeping the database schema simple and focused on frontend display requirements.
+
+## Repository Management and Task Execution
+
+### Local Repository Structure
+All repositories are managed under the following directory structure:
+```
+/Users/mac/project/git-repository/JokerTrickster/
+├── gallery_ios/          # iOS gallery app repository
+├── workflow/              # Main workflow repository
+├── board_game_app/        # Board game application
+├── eatplay_app/          # Food recommendation app
+└── ...                   # Other repositories
+```
+
+### Task Execution Workflow
+
+When a task is submitted with a `repository_name` (e.g., "gallery_ios"), the local-backend:
+
+1. **Repository Resolution**:
+   - Looks for repository in `/Users/mac/project/git-repository/JokerTrickster/{repository_name}`
+   - Validates that the directory exists and is a Git repository
+
+2. **Branch Management**:
+   - Creates a new feature branch: `claude-task-{timestamp}`
+   - Switches to the new branch for task execution
+   - Example: `claude-task-1727692800`
+
+3. **Task Execution**:
+   - Executes Claude AI tasks within the repository directory
+   - Files are created/modified in the repository context
+   - All changes happen in the feature branch
+
+4. **Git Operations**:
+   - Automatically stages all changes: `git add .`
+   - Creates commit with descriptive message
+   - Pushes branch to GitHub: `git push --set-upstream origin {branch}`
+
+5. **Pull Request Creation**:
+   - Automatically creates GitHub PR from feature branch to main
+   - PR title includes task description
+   - PR body includes task details and AI-generated metadata
+
+### Repository Requirements
+
+For a repository to be eligible for task execution:
+- Must exist in `/Users/mac/project/git-repository/JokerTrickster/`
+- Must be a valid Git repository (contains `.git` directory)
+- Must have a configured remote origin pointing to GitHub
+- Must be up-to-date with the remote main branch
+
+### Example Task Flow
+
+```bash
+# Task: "Add current date to README.md"
+# Repository: gallery_ios
+
+1. Repository resolution: /Users/mac/project/git-repository/JokerTrickster/gallery_ios
+2. Branch creation: git checkout -b claude-task-1727692800
+3. Claude execution: Modifies README.md with current date
+4. Git operations:
+   - git add .
+   - git commit -m "feat: Add current date to README.md"
+   - git push --set-upstream origin claude-task-1727692800
+5. PR creation: Creates PR #123 with changes
+```
+
+This ensures all AI-driven changes are properly versioned, reviewed, and integrated through standard Git workflows.
