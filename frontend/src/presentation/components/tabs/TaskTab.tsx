@@ -66,6 +66,8 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
   const [selectedGitHubPR, setSelectedGitHubPR] = useState<GitHubPullRequest | undefined>();
   const [selectedTask, setSelectedTask] = useState<Task | undefined>();
   const [showTaskDetailDialog, setShowTaskDetailDialog] = useState(false);
+  const [showExecuteDialog, setShowExecuteDialog] = useState(false);
+  const [taskToExecute, setTaskToExecute] = useState<Task | undefined>();
   
   const activityLogger = ActivityLogger.getInstance();
   const taskFileManager = TaskFileManager.getInstance();
@@ -314,15 +316,24 @@ Task created on ${new Date().toISOString()}`;
     }
   };
 
-  const handleExecuteTask = async (taskId: string) => {
+  const handleExecuteTaskClick = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
+    setTaskToExecute(task);
+    setShowExecuteDialog(true);
+  };
+
+  const handleConfirmExecuteTask = async () => {
+    if (!taskToExecute) return;
+
+    setShowExecuteDialog(false);
+
     try {
-      console.log('Executing task:', taskId);
+      console.log('Executing task:', taskToExecute.id);
 
       // Call the backend execute API directly
-      const response = await fetch(apiConfig.endpoints.tasks.execute(taskId), {
+      const response = await fetch(apiConfig.endpoints.tasks.execute(taskToExecute.id), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -341,13 +352,20 @@ Task created on ${new Date().toISOString()}`;
       console.log('Task execution result:', result);
 
       // Log task execution started
-      activityLogger.logTaskStarted(taskId, task.title);
+      activityLogger.logTaskStarted(taskToExecute.id, taskToExecute.title);
 
       // Reload tasks to reflect changes
       await loadTasks();
     } catch (error) {
       console.error('Failed to execute task:', error);
+    } finally {
+      setTaskToExecute(undefined);
     }
+  };
+
+  const handleCancelExecuteTask = () => {
+    setShowExecuteDialog(false);
+    setTaskToExecute(undefined);
   };
 
   const handleCreateTaskFromIssue = (issue: GitHubIssue) => {
@@ -645,7 +663,7 @@ Task created on ${new Date().toISOString()}`;
                     </Button>
                   )}
                   {task.status === 'pending' && (
-                    <Button size="sm" onClick={() => handleExecuteTask(task.id)}>
+                    <Button size="sm" onClick={() => handleExecuteTaskClick(task.id)}>
                       <Play className="h-4 w-4 mr-2" />
                       Execute
                     </Button>
@@ -1354,6 +1372,37 @@ Task created on ${new Date().toISOString()}`;
                   </a>
                 </Button>
               )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+
+    {/* Execute Task Confirmation Dialog */}
+    <Dialog open={showExecuteDialog} onOpenChange={setShowExecuteDialog}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Execute Task</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to execute this task?
+          </DialogDescription>
+        </DialogHeader>
+        {taskToExecute && (
+          <div className="space-y-4">
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-medium text-sm">{taskToExecute.title}</h4>
+              {taskToExecute.description && (
+                <p className="text-sm text-gray-600 mt-1">{taskToExecute.description}</p>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={handleCancelExecuteTask}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmExecuteTask}>
+                <Play className="h-4 w-4 mr-2" />
+                Start Execute
+              </Button>
             </div>
           </div>
         )}

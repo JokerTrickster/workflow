@@ -329,11 +329,21 @@ func (w *ConcurrentTaskWorker) commitAndPushChanges(ctx context.Context, taskMsg
 		return fmt.Errorf("working directory is required for Git operations")
 	}
 
-	// Check if it's a Git repository
+	// Check if it's a Git repository, if not try to initialize or clone
 	gitDir := filepath.Join(workingDir, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		log.Printf("Not a Git repository, skipping commit and push: %s", workingDir)
-		return nil
+		log.Printf("Not a Git repository: %s", workingDir)
+
+		// Try to clone the repository if repository name is provided
+		if taskMsg.RepositoryName != "" {
+			if err := w.cloneOrInitRepository(ctx, taskMsg.RepositoryName, workingDir); err != nil {
+				log.Printf("Failed to setup Git repository: %v", err)
+				return nil // Don't fail the task, just skip Git operations
+			}
+		} else {
+			log.Printf("No repository name provided, skipping Git operations")
+			return nil
+		}
 	}
 
 	// Add all changes
@@ -392,6 +402,51 @@ func (w *ConcurrentTaskWorker) runGitCommandWithOutput(ctx context.Context, work
 
 	log.Printf("Git command succeeded: git %s", strings.Join(args, " "))
 	return string(output), nil
+}
+
+// cloneOrInitRepository clones a repository or initializes a new one
+func (w *ConcurrentTaskWorker) cloneOrInitRepository(ctx context.Context, repositoryName, workingDir string) error {
+	log.Printf("Setting up Git repository for %s in %s", repositoryName, workingDir)
+
+	// Try to clone from GitHub first
+	githubURL := fmt.Sprintf("https://github.com/%s.git", repositoryName)
+
+	// Remove the existing directory and clone fresh
+	if err := os.RemoveAll(workingDir); err != nil {
+		log.Printf("Failed to remove existing directory: %v", err)
+	}
+
+	parentDir := filepath.Dir(workingDir)
+	cloneName := filepath.Base(workingDir)
+
+	// Try to clone the repository
+	cmd := exec.CommandContext(ctx, "git", "clone", githubURL, cloneName)
+	cmd.Dir = parentDir
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Failed to clone repository %s: %v\nOutput: %s", githubURL, err, string(output))
+
+		// If clone fails, create the directory and initialize as git repo
+		if err := os.MkdirAll(workingDir, 0755); err != nil {
+			return fmt.Errorf("failed to create working directory: %w", err)
+		}
+
+		if err := w.runGitCommand(ctx, workingDir, "init"); err != nil {
+			return fmt.Errorf("failed to initialize git repository: %w", err)
+		}
+
+		// Try to add the remote origin
+		if err := w.runGitCommand(ctx, workingDir, "remote", "add", "origin", githubURL); err != nil {
+			log.Printf("Warning: failed to add remote origin: %v", err)
+		}
+
+		log.Printf("Initialized new Git repository in %s", workingDir)
+	} else {
+		log.Printf("Successfully cloned repository %s to %s", githubURL, workingDir)
+	}
+
+	return nil
 }
 
 // createPullRequest creates a GitHub PR for completed tasks

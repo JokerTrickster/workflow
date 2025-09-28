@@ -157,21 +157,6 @@ export class ClaudeService {
     });
   }
 
-  /**
-   * Submit task and wait for completion with progress updates
-   * @deprecated Use runTasks() + pollTaskStatus() separately to avoid double API calls
-   */
-  async runTasksAndWait(
-    request: ReqRunTasksClaude,
-    onProgress?: (status: TaskStatus) => void,
-    pollInterval: number = 2000
-  ): Promise<TaskStatus> {
-    // Submit the task
-    const submitResponse = await this.runTasks(request);
-
-    // Poll for completion
-    return this.pollTaskStatus(submitResponse.request_id, onProgress, pollInterval);
-  }
 
   /**
    * Get task history for a repository with pagination
