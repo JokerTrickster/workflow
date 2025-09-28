@@ -36,22 +36,29 @@ export class ApiDataSourceImpl implements ApiDataSource {
   }
 
   async getTasks(repositoryName: string): Promise<Task[]> {
-    return await apiClient.get<Task[]>(`/tasks?repository_name=${encodeURIComponent(repositoryName)}`);
+    return await apiClient.get<Task[]>(`/api/v1/tasks?repository_name=${encodeURIComponent(repositoryName)}`);
   }
 
-  async createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task> {
-    return await apiClient.post<Task>('/tasks', task);
+  async createTask(taskData: {
+    tasks: string;
+    repository_name: string;
+    working_dir?: string;
+    interactive?: boolean;
+    cmd?: string;
+    provider: 'claude' | 'codex' | 'cursor';
+  }): Promise<Task> {
+    return await apiClient.post<Task>('/api/v1/tasks', taskData);
   }
 
   async updateTask(id: string, updates: Partial<Task>): Promise<Task> {
-    return await apiClient.put<Task>(`/tasks/${id}`, updates);
+    return await apiClient.put<Task>(`/api/v1/tasks/${id}`, updates);
   }
 
   async deleteTask(id: string): Promise<void> {
-    await apiClient.delete(`/tasks/${id}`);
+    await apiClient.delete(`/api/v1/tasks/${id}`);
   }
 
   async executeTask(id: string): Promise<void> {
-    await apiClient.post(`/tasks/${id}/execute`);
+    await apiClient.post(`/api/v1/tasks/${id}/execute`);
   }
 }

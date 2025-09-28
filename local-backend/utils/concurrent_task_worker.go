@@ -313,11 +313,9 @@ func (w *ConcurrentTaskWorker) shouldCreatePR(result *AITaskResponse) bool {
 		return false
 	}
 
-	// Check if task involved file changes
-	return len(result.FilesModified) > 0 ||
-		   strings.Contains(result.Output, "git add") ||
-		   strings.Contains(result.Output, "modified:") ||
-		   strings.Contains(result.Output, "new file:")
+	// Always create PR for successful tasks to ensure visibility
+	// The PR creation process will validate if there are actual changes
+	return true
 }
 
 // commitAndPushChanges commits and pushes changes to Git repository
@@ -370,12 +368,16 @@ func (w *ConcurrentTaskWorker) commitAndPushChanges(ctx context.Context, taskMsg
 		return fmt.Errorf("failed to commit changes: %w", err)
 	}
 
-	// Push changes
-	if err := w.runGitCommand(ctx, workingDir, "push"); err != nil {
-		// If push fails, try to set upstream and push
-		if err := w.runGitCommand(ctx, workingDir, "push", "--set-upstream", "origin", "HEAD"); err != nil {
-			return fmt.Errorf("failed to push changes: %w", err)
-		}
+	// Get current branch name
+	branchOutput, err := w.runGitCommandWithOutput(ctx, workingDir, "branch", "--show-current")
+	if err != nil {
+		return fmt.Errorf("failed to get current branch: %w", err)
+	}
+	currentBranch := strings.TrimSpace(branchOutput)
+
+	// Push changes to the current branch and set upstream
+	if err := w.runGitCommand(ctx, workingDir, "push", "--set-upstream", "origin", currentBranch); err != nil {
+		return fmt.Errorf("failed to push changes to branch %s: %w", currentBranch, err)
 	}
 
 	log.Printf("Successfully committed and pushed changes for task: %s", taskMsg.Tasks)
@@ -404,7 +406,7 @@ func (w *ConcurrentTaskWorker) runGitCommandWithOutput(ctx context.Context, work
 	return string(output), nil
 }
 
-// cloneOrInitRepository clones a repository or initializes a new one
+// cloneOrInitRepository clones a repository and creates a working branch
 func (w *ConcurrentTaskWorker) cloneOrInitRepository(ctx context.Context, repositoryName, workingDir string) error {
 	log.Printf("Setting up Git repository for %s in %s", repositoryName, workingDir)
 
@@ -426,24 +428,18 @@ func (w *ConcurrentTaskWorker) cloneOrInitRepository(ctx context.Context, reposi
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Failed to clone repository %s: %v\nOutput: %s", githubURL, err, string(output))
+		return fmt.Errorf("failed to clone repository: %w", err)
+	}
 
-		// If clone fails, create the directory and initialize as git repo
-		if err := os.MkdirAll(workingDir, 0755); err != nil {
-			return fmt.Errorf("failed to create working directory: %w", err)
-		}
+	log.Printf("Successfully cloned repository %s to %s", githubURL, workingDir)
 
-		if err := w.runGitCommand(ctx, workingDir, "init"); err != nil {
-			return fmt.Errorf("failed to initialize git repository: %w", err)
-		}
-
-		// Try to add the remote origin
-		if err := w.runGitCommand(ctx, workingDir, "remote", "add", "origin", githubURL); err != nil {
-			log.Printf("Warning: failed to add remote origin: %v", err)
-		}
-
-		log.Printf("Initialized new Git repository in %s", workingDir)
+	// Create a new branch for this task
+	branchName := fmt.Sprintf("task-%d", time.Now().Unix())
+	if err := w.runGitCommand(ctx, workingDir, "checkout", "-b", branchName); err != nil {
+		log.Printf("Warning: failed to create branch %s: %v", branchName, err)
+		// Continue with main branch if branch creation fails
 	} else {
-		log.Printf("Successfully cloned repository %s to %s", githubURL, workingDir)
+		log.Printf("Created and switched to branch: %s", branchName)
 	}
 
 	return nil
