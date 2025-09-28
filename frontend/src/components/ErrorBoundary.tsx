@@ -134,7 +134,7 @@ function ComponentErrorFallback({
   onRetry 
 }: { 
   error: AppError; 
-  onRetry: () => void;
+  onRetry: () => Promise<any>;
 }) {
   return (
     <div className="p-4 border border-destructive/20 rounded-lg bg-destructive/5">
@@ -159,7 +159,7 @@ function PageErrorFallback({
   showDetails 
 }: { 
   error: AppError; 
-  onRetry: () => void;
+  onRetry: () => Promise<any>;
   showDetails: boolean;
 }) {
   return (
@@ -181,7 +181,7 @@ function CriticalErrorFallback({
   onRetry 
 }: { 
   error: AppError; 
-  onRetry: () => void;
+  onRetry: () => Promise<any>;
 }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-red-50">

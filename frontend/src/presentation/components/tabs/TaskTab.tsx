@@ -48,6 +48,7 @@ import {
 } from '../../../components/ui/dialog';
 import { useGitHubIssues } from '../../../hooks/useGitHubIssues';
 import { useGitHubPullRequests } from '../../../hooks/useGitHubPullRequests';
+import { apiConfig } from '../../../config/api';
 import { GitHubIssue, GitHubPullRequest } from '../../../types/github';
 
 interface TaskTabProps {
@@ -91,7 +92,7 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
     setIsLoadingTasks(true);
     try {
       // Load tasks from backend API
-      const apiResponse = await fetch(`http://localhost:8080/api/v1/tasks?repository_name=${repository.name}`);
+      const apiResponse = await fetch(apiConfig.endpoints.tasks.list(repository.name));
 
       if (apiResponse.ok) {
         const apiResult = await apiResponse.json();
@@ -113,22 +114,12 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
         setTasks(convertedTasks);
         console.log(`Loaded ${convertedTasks.length} tasks from backend for repository: ${repository.name}`);
       } else {
-        console.warn('⚠️ Failed to load tasks from backend, falling back to file manager');
-        // Fallback to file manager
-        const loadedTasks = await taskFileManager.loadTasksFromEpics(repository.name, forceRefresh);
-        setTasks(loadedTasks);
-        console.log(`Loaded ${loadedTasks.length} tasks from files for repository: ${repository.name}`);
+        console.warn('⚠️ Failed to load tasks from backend');
+        setTasks([]); // Set empty tasks instead of fallback
       }
     } catch (error) {
-      console.error('Failed to load tasks from backend, falling back to file manager:', error);
-      // Fallback to file manager
-      try {
-        const loadedTasks = await taskFileManager.loadTasksFromEpics(repository.name, forceRefresh);
-        setTasks(loadedTasks);
-        console.log(`Loaded ${loadedTasks.length} tasks from files for repository: ${repository.name}`);
-      } catch (fileError) {
-        console.error('Failed to load tasks from files:', fileError);
-      }
+      console.error('Failed to load tasks from backend:', error);
+      setTasks([]); // Set empty tasks on error
     } finally {
       setIsLoadingTasks(false);
     }
@@ -238,7 +229,7 @@ Task created on ${new Date().toISOString()}`;
 
       // 1. Create task in backend database
       try {
-        const apiResponse = await fetch('http://localhost:8080/api/v1/tasks', {
+        const apiResponse = await fetch(apiConfig.endpoints.tasks.create(), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -246,7 +237,7 @@ Task created on ${new Date().toISOString()}`;
           body: JSON.stringify({
             tasks: taskData.description,
             repository_name: repository.name,
-            provider: 'claude',
+            provider: taskData.provider || 'claude',
             working_dir: taskData.branch_name || undefined,
             cmd: undefined,
             interactive: false
@@ -326,22 +317,36 @@ Task created on ${new Date().toISOString()}`;
   const handleExecuteTask = async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
-    
+
     try {
-      // Update task file with in_progress status
-      await taskFileManager.updateTaskFile(taskId, {
-        status: 'in_progress',
-        startedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }, undefined, repository.name);
-      
-      // Reload tasks to reflect changes
-      await loadTasks();
-      
+      console.log('Executing task:', taskId);
+
+      // Call the backend execute API directly
+      const response = await fetch(apiConfig.endpoints.tasks.execute(taskId), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Execute response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Execute API failed:', errorData);
+        throw new Error(`Execute API failed: ${errorData}`);
+      }
+
+      const result = await response.json();
+      console.log('Task execution result:', result);
+
       // Log task execution started
       activityLogger.logTaskStarted(taskId, task.title);
+
+      // Reload tasks to reflect changes
+      await loadTasks();
     } catch (error) {
-      console.error('Failed to start task:', error);
+      console.error('Failed to execute task:', error);
     }
   };
 

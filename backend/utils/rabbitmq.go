@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"main/utils/config"
-	"time"
 
 	"github.com/streadway/amqp"
 )
@@ -14,17 +13,15 @@ type RabbitMQClient struct {
 	channel    *amqp.Channel
 }
 
+// TaskMessage matches the ReqRunTasksClaude structure from local-backend
 type TaskMessage struct {
-	RequestID      string                 `json:"request_id"`
-	Type           string                 `json:"type"`
-	Tasks          string                 `json:"tasks"`
-	RepositoryName string                 `json:"repository_name"`
-	WorkingDir     *string                `json:"working_dir,omitempty"`
-	Cmd            *string                `json:"cmd,omitempty"`
-	Provider       string                 `json:"provider"`
-	Interactive    bool                   `json:"interactive"`
-	Payload        map[string]interface{} `json:"payload"`
-	Timestamp      time.Time              `json:"timestamp"`
+	Tasks          string `json:"tasks" validate:"required"`           // 실행할 작업 내용
+	RepositoryName string `json:"repository_name" validate:"required"` // 레포지토리 이름 (필수)
+	WorkingDir     string `json:"working_dir,omitempty"`               // 작업 디렉토리 (옵션)
+	Interactive    bool   `json:"interactive,omitempty"`               // 대화형 모드: 여러 작업을 순차 실행
+	Cmd            string `json:"cmd,omitempty"`                       // Claude CLI 명령어 경로 (옵션)
+	ContinueTask   bool   `json:"continue_task,omitempty"`             // 기존 작업 이어서 하기 (옵션)
+	Provider       string `json:"provider" validate:"required"`       // AI 모델 제공자 (예: "claude") (필수)
 }
 
 var GlobalRabbitMQ *RabbitMQClient
@@ -75,11 +72,6 @@ func NewRabbitMQClient() (*RabbitMQClient, error) {
 func (r *RabbitMQClient) PublishTaskMessage(msg *TaskMessage) error {
 	if r == nil || r.channel == nil {
 		return fmt.Errorf("RabbitMQ client not initialized")
-	}
-
-	// 타임스탬프 설정
-	if msg.Timestamp.IsZero() {
-		msg.Timestamp = time.Now()
 	}
 
 	body, err := json.Marshal(msg)

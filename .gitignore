@@ -10,6 +10,9 @@ epic-dashboard-ux-improvements/
 # Environment variables
 .env
 local-backend/.env
+.env.example
+local-backend/.env.example
+backend/.env.example
 
 # Database files
 *.db

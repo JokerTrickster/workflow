@@ -5,6 +5,7 @@ import (
 	"time"
 	_interface "main/features/task/model/interface"
 	"main/features/task/model/response"
+	"main/utils"
 	"main/utils/db"
 )
 
@@ -35,8 +36,33 @@ func (uc *ExecuteTaskUseCase) ExecuteTask(requestID string) (*response.ExecuteTa
 		return nil, fmt.Errorf("failed to update task status: %w", err)
 	}
 
-	// TODO: Send task to RabbitMQ queue for processing
-	// This would be implemented when RabbitMQ integration is ready
+	// Create message for RabbitMQ queue
+	workingDir := ""
+	if task.WorkingDir != nil {
+		workingDir = *task.WorkingDir
+	}
+
+	cmd := ""
+	if task.Cmd != nil {
+		cmd = *task.Cmd
+	}
+
+	taskMessage := &utils.TaskMessage{
+		Tasks:          task.Tasks,
+		RepositoryName: task.RepositoryName,
+		WorkingDir:     workingDir,
+		Interactive:    task.Interactive,
+		Cmd:            cmd,
+		ContinueTask:   false, // Default to false, can be made configurable
+		Provider:       task.Provider,
+	}
+
+	// Send task to RabbitMQ queue for processing
+	if err := utils.PublishTask(taskMessage); err != nil {
+		// Log the error but don't fail the request - the task status is already updated
+		fmt.Printf("Failed to publish task to RabbitMQ: %v\n", err)
+		// Note: In production, you might want to implement retry logic or dead letter queues
+	}
 
 	return &response.ExecuteTaskResponse{
 		RequestID: requestID,

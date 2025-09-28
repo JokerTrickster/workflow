@@ -38,7 +38,6 @@ export default function Dashboard() {
     isLoading,
     error,
     refetch: refetchRepositories,
-    isRefetching,
     connectRepository
   } = useRepositories();
   
@@ -47,7 +46,6 @@ export default function Dashboard() {
     repositories: repositories?.length || 0,
     isLoading,
     error: error?.message,
-    isRefetching,
     firstRepo: repositories?.[0]?.name
   });
 
@@ -103,21 +101,25 @@ export default function Dashboard() {
   // Get unique languages for filter - memoized for performance
   const availableLanguages = useMemo(() => {
     if (!repositories) return [];
-    
+
     return Array.from(
-      new Set(repositories.map(repo => repo.language).filter(Boolean))
+      new Set(
+        repositories
+          .map(repo => repo.language)
+          .filter((language): language is string => Boolean(language))
+      )
     ).sort();
   }, [repositories]);
 
   // Handle retry for different error scenarios - memoized
-  const handleRetry = useCallback(() => {
+  const handleRetry = useCallback(async () => {
     if (!isOnline) {
       // For offline scenarios, just show a message about connectivity
       alert('Please check your internet connection and try again.');
       return;
     }
-    
-    refetchRepositories();
+
+    await refetchRepositories();
   }, [isOnline, refetchRepositories]);
 
   // Show workspace if a repository is selected
@@ -171,7 +173,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <Header title="Dashboard" />
       
       <main className="container mx-auto max-w-7xl px-6 py-8">
         {/* Network Status Banner */}
@@ -224,9 +226,9 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={handleRetry}
-                disabled={isLoading || isRefetching}
+                disabled={isLoading}
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${(isLoading || isRefetching) ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
             </div>
@@ -421,7 +423,7 @@ export default function Dashboard() {
                   repositories={filteredRepositories}
                   onSelect={handleRepositorySelect}
                   onConnect={handleRepositoryConnect}
-                  isLoading={isRefetching}
+                  isLoading={isLoading}
                 />
               </ErrorBoundary>
             )}

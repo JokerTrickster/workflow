@@ -1,6 +1,5 @@
 import { ErrorHandler, ErrorType } from '../../utils/errorHandler';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
+import { getApiBaseUrl } from '../../config/api';
 
 interface ApiResponse<T = any> {
   data: T;
@@ -12,7 +11,7 @@ class ApiClient {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = API_BASE_URL;
+    this.baseURL = getApiBaseUrl();
   }
 
   private async request<T>(

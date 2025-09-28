@@ -1,139 +1,134 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
-import matter from 'gray-matter';
-import { TaskFile, TaskFileMetadata } from '../route';
+import { getApiBaseUrl } from '../../../../../config/api';
 
 // Force dynamic rendering - no static generation
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const EPICS_BASE_DIR = path.resolve(process.cwd(), '../.claude/epics');
-
-// Get current repository name
-async function getCurrentRepository(): Promise<string> {
-  return process.env.REPOSITORY_NAME || 'workflow';
-}
-
-// Get tasks directory for specific repository
-function getTasksDir(repository: string): string {
-  return path.join(EPICS_BASE_DIR, 'repositories', repository, 'tasks');
-}
-
-// Get specific task file
+// Get specific task - proxy to backend
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { searchParams } = new URL(request.url);
-    const repository = searchParams.get('repository') || 'workflow';
-    const TASKS_DIR = getTasksDir(repository);
-    const { id } = params;
-    const filename = `${id}.md`;
-    const filePath = path.join(TASKS_DIR, filename);
-    
-    const content = await fs.readFile(filePath, 'utf-8');
-    const { data: frontMatter, content: markdownContent } = matter(content);
-    
-    const taskFile: TaskFile = {
-      metadata: frontMatter as TaskFileMetadata,
-      content: markdownContent.trim(),
-    };
-    
-    // Ensure repository field is set
-    if (!taskFile.metadata.repository) {
-      taskFile.metadata.repository = repository;
+    const response = await fetch(`${getApiBaseUrl()}/tasks/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: 'Task not found in backend' },
+        { status: response.status }
+      );
     }
-    
-    return NextResponse.json(taskFile);
+
+    const taskData = await response.json();
+    return NextResponse.json(taskData);
   } catch (error) {
-    console.error(`Failed to get task ${params.id}:`, error);
-    
-    if ((error as any).code === 'ENOENT') {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-    }
-    
+    console.error(`Failed to get task ${id}:`, error);
     return NextResponse.json({ error: 'Failed to get task' }, { status: 500 });
   }
 }
 
-// Update task file
+// Update task - proxy to backend
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { searchParams } = new URL(request.url);
-    const repository = searchParams.get('repository') || 'workflow';
-    const TASKS_DIR = getTasksDir(repository);
-    const { id } = params;
-    const filename = `${id}.md`;
-    const filePath = path.join(TASKS_DIR, filename);
-    
-    const updatedTaskFile: TaskFile = await request.json();
-    
-    // Ensure the ID matches
-    if (updatedTaskFile.metadata.id !== id) {
-      return NextResponse.json({ error: 'Task ID mismatch' }, { status: 400 });
+    const requestBody = await request.json();
+
+    const response = await fetch(`${getApiBaseUrl()}/tasks/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      return NextResponse.json(
+        { error: 'Failed to update task in backend', details: errorData },
+        { status: response.status }
+      );
     }
-    
-    // Ensure repository field is set correctly
-    if (!updatedTaskFile.metadata.repository) {
-      updatedTaskFile.metadata.repository = repository;
-    }
-    
-    // Generate markdown content with frontmatter
-    const frontMatter = Object.entries(updatedTaskFile.metadata)
-      .map(([key, value]) => {
-        if (value === undefined || value === null) return null;
-        if (typeof value === 'string' && value.includes('\n')) {
-          return `${key}: |\n  ${value.replace(/\n/g, '\n  ')}`;
-        }
-        return `${key}: ${JSON.stringify(value)}`;
-      })
-      .filter(Boolean)
-      .join('\n');
-    
-    const fileContent = `---\n${frontMatter}\n---\n\n${updatedTaskFile.content}`;
-    
-    await fs.writeFile(filePath, fileContent, 'utf-8');
-    
-    return NextResponse.json(updatedTaskFile);
+
+    const result = await response.json();
+    return NextResponse.json(result);
   } catch (error) {
-    console.error(`Failed to update task ${params.id}:`, error);
-    
-    if ((error as any).code === 'ENOENT') {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-    }
-    
+    console.error(`Failed to update task ${id}:`, error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
   }
 }
 
-// Delete task file
+// Execute task
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+
+    // Call the backend API to execute the task
+    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
+    const executeUrl = `${backendUrl}/tasks/${id}/execute`;
+
+    const response = await fetch(executeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('Backend execute API failed:', errorData);
+      return NextResponse.json(
+        { error: 'Failed to execute task on backend', details: errorData },
+        { status: response.status }
+      );
+    }
+
+    const result = await response.json();
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error(`Failed to execute task ${id}:`, error);
+    return NextResponse.json({ error: 'Failed to execute task' }, { status: 500 });
+  }
+}
+
+// Delete task - proxy to backend
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { searchParams } = new URL(request.url);
-    const repository = searchParams.get('repository') || 'workflow';
-    const TASKS_DIR = getTasksDir(repository);
-    const { id } = params;
-    const filename = `${id}.md`;
-    const filePath = path.join(TASKS_DIR, filename);
-    
-    await fs.unlink(filePath);
-    
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error(`Failed to delete task ${params.id}:`, error);
-    
-    if ((error as any).code === 'ENOENT') {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    const response = await fetch(`${getApiBaseUrl()}/tasks/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      return NextResponse.json(
+        { error: 'Failed to delete task in backend', details: errorData },
+        { status: response.status }
+      );
     }
-    
+
+    const result = await response.json();
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error(`Failed to delete task ${id}:`, error);
     return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
   }
 }

@@ -1,0 +1,59 @@
+name: Branch Protection Setup
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '.github/workflows/**'
+      - 'CLAUDE.md'
+
+jobs:
+  setup-branch-protection:
+    runs-on: ubuntu-latest
+    name: Setup Branch Protection Rules
+    if: github.event_name == 'push' && github.actor != 'dependabot[bot]'
+
+    steps:
+    - name: Setup branch protection
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const { owner, repo } = context.repo;
+          const branch = context.ref.replace('refs/heads/', '');
+
+          console.log(`Setting up protection for ${owner}/${repo}:${branch}`);
+
+          try {
+            await github.rest.repos.updateBranchProtection({
+              owner,
+              repo,
+              branch,
+              required_status_checks: {
+                strict: true,
+                contexts: [
+                  'check-standards',
+                  'lint-and-format',
+                  'security-check'
+                ]
+              },
+              enforce_admins: false,
+              required_pull_request_reviews: {
+                required_approving_review_count: 1,
+                dismiss_stale_reviews: true,
+                require_code_owner_reviews: false
+              },
+              restrictions: null,
+              allow_force_pushes: false,
+              allow_deletions: false
+            });
+
+            console.log('✅ Branch protection rules updated successfully');
+          } catch (error) {
+            if (error.status === 403) {
+              console.log('⚠️  Insufficient permissions to set up branch protection');
+              console.log('Please set up branch protection manually in repository settings');
+            } else {
+              console.log('❌ Error setting up branch protection:', error.message);
+            }
+          }

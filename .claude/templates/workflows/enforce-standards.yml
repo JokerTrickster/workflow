@@ -1,0 +1,299 @@
+name: Enforce Project Standards
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  check-standards:
+    runs-on: ubuntu-latest
+    name: Check Project Standards Compliance
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check CLAUDE.md exists
+      run: |
+        if [ ! -f "CLAUDE.md" ]; then
+          echo "❌ CLAUDE.md not found. Run: ./path/to/init-project.sh or ./path/to/sync-standards.sh"
+          exit 1
+        fi
+        echo "✅ CLAUDE.md found"
+
+    - name: Validate CLAUDE.md content
+      run: |
+        echo "Checking CLAUDE.md structure..."
+
+        # Check for required sections
+        required_sections=(
+          "## Core Rules System"
+          "## Base Rules"
+          "## Project-Specific Rules"
+          "## Validation Checklist"
+        )
+
+        missing_sections=()
+        for section in "${required_sections[@]}"; do
+          if ! grep -q "$section" CLAUDE.md; then
+            missing_sections+=("$section")
+          fi
+        done
+
+        if [ ${#missing_sections[@]} -eq 0 ]; then
+          echo "✅ All required sections found in CLAUDE.md"
+        else
+          echo "❌ Missing required sections in CLAUDE.md:"
+          printf '%s\n' "${missing_sections[@]}"
+          exit 1
+        fi
+
+    - name: Check branch naming convention
+      if: github.event_name == 'pull_request'
+      run: |
+        branch_name="${{ github.head_ref }}"
+        echo "Checking branch name: $branch_name"
+
+        # Allow specific patterns
+        if [[ "$branch_name" =~ ^(feature|fix|hotfix|docs|refactor|test|chore)\/[a-z0-9-]+$ ]]; then
+          echo "✅ Branch name follows convention: $branch_name"
+        else
+          echo "❌ Branch name '$branch_name' doesn't follow convention"
+          echo "Expected pattern: (feature|fix|hotfix|docs|refactor|test|chore)/{description}"
+          echo "Examples: feature/user-auth, fix/login-bug, docs/readme-update"
+          exit 1
+        fi
+
+    - name: Check commit message format
+      run: |
+        echo "Checking recent commit messages..."
+
+        # Get commits for this PR or push
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          commits=$(git log --format="%s" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+        else
+          commits=$(git log --format="%s" -5)  # Check last 5 commits
+        fi
+
+        bad_commits=()
+        while IFS= read -r commit_msg; do
+          if [[ -n "$commit_msg" ]]; then
+            # Check for vague commit messages
+            if [[ "$commit_msg" =~ ^(fix|update|change|modify|improve)$ ]] || \
+               [[ "$commit_msg" =~ ^(fix|update|change|modify|improve)[[:space:]]*$ ]]; then
+              bad_commits+=("$commit_msg")
+            fi
+          fi
+        done <<< "$commits"
+
+        if [ ${#bad_commits[@]} -eq 0 ]; then
+          echo "✅ Commit messages look good"
+        else
+          echo "⚠️  Found vague commit messages:"
+          printf '%s\n' "${bad_commits[@]}"
+          echo "Consider more descriptive messages like:"
+          echo "  - feat: add user authentication middleware"
+          echo "  - fix: resolve timeout issue in login endpoint"
+          echo "  - docs: update API documentation"
+        fi
+
+    - name: Check for TODO/FIXME comments
+      run: |
+        echo "Checking for TODO/FIXME comments in code..."
+
+        # Find TODO/FIXME comments (excluding this workflow file)
+        todos=$(grep -r -n --exclude-dir=.git --exclude="*.yml" --exclude="*.yaml" \
+                "TODO\|FIXME\|XXX\|HACK" . || true)
+
+        if [ -z "$todos" ]; then
+          echo "✅ No TODO/FIXME comments found"
+        else
+          echo "⚠️  Found TODO/FIXME comments:"
+          echo "$todos"
+          echo ""
+          echo "Please resolve these before merging or convert to GitHub issues"
+        fi
+
+    - name: Check for console.log/print statements
+      run: |
+        echo "Checking for debugging statements..."
+
+        # Look for common debugging statements
+        debug_statements=$(grep -r -n --exclude-dir=.git --exclude-dir=node_modules \
+                          --exclude="*.md" --exclude="*.yml" --exclude="*.yaml" \
+                          "console\.log\|print(\|debugger\|var_dump\|dd(" . || true)
+
+        if [ -z "$debug_statements" ]; then
+          echo "✅ No debugging statements found"
+        else
+          echo "⚠️  Found debugging statements:"
+          echo "$debug_statements"
+          echo ""
+          echo "Remove debugging statements before production"
+        fi
+
+    - name: Check file organization
+      run: |
+        echo "Checking file organization..."
+
+        # Check for misplaced test files
+        misplaced_tests=$(find . -name "*.test.*" -not -path "./tests/*" -not -path "./__tests__/*" -not -path "./test/*" || true)
+
+        if [ -z "$misplaced_tests" ]; then
+          echo "✅ Test files are properly organized"
+        else
+          echo "⚠️  Found test files outside test directories:"
+          echo "$misplaced_tests"
+          echo "Move test files to tests/, __tests__/, or test/ directories"
+        fi
+
+        # Check for temp files
+        temp_files=$(find . -name "*.tmp" -o -name "*.temp" -o -name "*~" -o -name ".DS_Store" || true)
+
+        if [ -z "$temp_files" ]; then
+          echo "✅ No temporary files found"
+        else
+          echo "⚠️  Found temporary files:"
+          echo "$temp_files"
+          echo "Add these to .gitignore or remove them"
+        fi
+
+  lint-and-format:
+    runs-on: ubuntu-latest
+    name: Code Quality Checks
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js (if package.json exists)
+      if: hashFiles('package.json') != ''
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      if: hashFiles('package.json') != ''
+      run: npm ci
+
+    - name: Run linter
+      if: hashFiles('package.json') != ''
+      run: |
+        if npm run lint --if-present; then
+          echo "✅ Linting passed"
+        else
+          echo "❌ Linting failed - please fix the issues above"
+          exit 1
+        fi
+
+    - name: Check formatting
+      if: hashFiles('package.json') != ''
+      run: |
+        if npm run format:check --if-present; then
+          echo "✅ Code formatting is correct"
+        else
+          echo "⚠️  Code formatting issues found. Run 'npm run format' to fix"
+        fi
+
+    - name: Type checking
+      if: hashFiles('package.json') != '' && hashFiles('tsconfig.json') != ''
+      run: |
+        if npm run type-check --if-present || npx tsc --noEmit --if-present; then
+          echo "✅ Type checking passed"
+        else
+          echo "❌ Type checking failed - please fix the issues above"
+          exit 1
+        fi
+
+  security-check:
+    runs-on: ubuntu-latest
+    name: Security Checks
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check for secrets in code
+      run: |
+        echo "Checking for potential secrets..."
+
+        # Common secret patterns
+        secret_patterns=(
+          "password\s*=\s*['\"][^'\"]{8,}"
+          "api[_-]?key\s*[=:]\s*['\"][^'\"]{8,}"
+          "secret\s*[=:]\s*['\"][^'\"]{8,}"
+          "token\s*[=:]\s*['\"][^'\"]{8,}"
+          "['\"][A-Za-z0-9+/]{32,}['\"]"
+        )
+
+        secrets_found=false
+        for pattern in "${secret_patterns[@]}"; do
+          matches=$(grep -r -i --exclude-dir=.git --exclude="*.md" -E "$pattern" . || true)
+          if [ -n "$matches" ]; then
+            if [ "$secrets_found" = false ]; then
+              echo "⚠️  Potential secrets found:"
+              secrets_found=true
+            fi
+            echo "$matches"
+          fi
+        done
+
+        if [ "$secrets_found" = false ]; then
+          echo "✅ No obvious secrets found in code"
+        else
+          echo ""
+          echo "Please review these matches and move secrets to environment variables"
+        fi
+
+    - name: Check .env files are ignored
+      run: |
+        echo "Checking .gitignore for environment files..."
+
+        if [ -f ".gitignore" ]; then
+          if grep -q "\.env" .gitignore; then
+            echo "✅ .env files are properly ignored"
+          else
+            echo "⚠️  .env not found in .gitignore - add it to prevent secret leaks"
+          fi
+        else
+          echo "⚠️  .gitignore not found - create one to prevent accidental commits"
+        fi
+
+  summary:
+    runs-on: ubuntu-latest
+    name: Standards Check Summary
+    needs: [check-standards, lint-and-format, security-check]
+    if: always()
+
+    steps:
+    - name: Summary
+      run: |
+        echo "## Project Standards Check Summary"
+        echo ""
+
+        if [ "${{ needs.check-standards.result }}" == "success" ]; then
+          echo "✅ Standards compliance: PASSED"
+        else
+          echo "❌ Standards compliance: FAILED"
+        fi
+
+        if [ "${{ needs.lint-and-format.result }}" == "success" ]; then
+          echo "✅ Code quality: PASSED"
+        elif [ "${{ needs.lint-and-format.result }}" == "skipped" ]; then
+          echo "⏭️  Code quality: SKIPPED"
+        else
+          echo "❌ Code quality: FAILED"
+        fi
+
+        if [ "${{ needs.security-check.result }}" == "success" ]; then
+          echo "✅ Security check: PASSED"
+        else
+          echo "❌ Security check: FAILED"
+        fi
+
+        echo ""
+        echo "For more details on project standards, see CLAUDE.md"

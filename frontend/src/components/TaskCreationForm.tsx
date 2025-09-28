@@ -7,8 +7,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
-import { 
-  ExternalLink, 
+import {
+  ExternalLink,
   GitBranch,
   AlertCircle,
   GitPullRequest,
@@ -16,6 +16,13 @@ import {
   Users,
   Loader2
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 
 interface TaskCreationFormProps {
   repositoryId: number;
@@ -58,6 +65,8 @@ export function TaskCreationForm({
     if (githubPullRequest) return githubPullRequest.head.ref;
     return '';
   });
+
+  const [provider, setProvider] = useState<'claude' | 'codex' | 'cursor'>('claude');
 
   // Validation errors state
   const [errors, setErrors] = useState<{
@@ -104,10 +113,11 @@ export function TaskCreationForm({
       repository_id: repositoryId,
       branch_name: branchName.trim() || undefined,
       pr_url: githubPullRequest?.html_url || undefined,
+      provider: provider,
     };
 
     await onSubmit(taskData);
-  }, [title, description, branchName, repositoryId, githubPullRequest, onSubmit]);
+  }, [title, description, branchName, repositoryId, githubPullRequest, provider, onSubmit]);
 
   const getGitHubMetadata = () => {
     if (!githubItem) return null;
@@ -269,6 +279,22 @@ export function TaskCreationForm({
         {errors.branchName && (
           <p className="text-sm text-red-600 mt-1">{errors.branchName}</p>
         )}
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="provider" className="text-sm font-medium">
+          AI Provider <span className="text-red-500">*</span>
+        </label>
+        <Select value={provider} onValueChange={(value: 'claude' | 'codex' | 'cursor') => setProvider(value)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select AI provider" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="claude">Claude</SelectItem>
+            <SelectItem value="codex">Codex</SelectItem>
+            <SelectItem value="cursor">Cursor CLI</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">

@@ -154,7 +154,7 @@ export function ErrorMessage({
                 onClick={handleRetry}
                 disabled={isRetrying}
                 className="gap-2"
-                aria-describedby={`error-${error.id}`}
+                aria-describedby={`error-${error.code}`}
               >
                 <RefreshCw className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} aria-hidden="true" />
                 {isRetrying ? '다시 시도 중...' : '다시 시도'}
