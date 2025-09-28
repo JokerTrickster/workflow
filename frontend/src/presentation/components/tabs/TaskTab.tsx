@@ -332,8 +332,8 @@ Task created on ${new Date().toISOString()}`;
     try {
       console.log('Executing task:', taskToExecute.id);
 
-      // Call the backend execute API directly
-      const response = await fetch(apiConfig.endpoints.tasks.execute(taskToExecute.id), {
+      // Use direct API call with explicit POST method
+      const response = await fetch(`http://localhost:8080/api/v1/tasks/${taskToExecute.id}/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
