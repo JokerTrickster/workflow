@@ -19,7 +19,7 @@ import (
 // @version 1.0
 // @description This is a workflow management backend server API
 // @host localhost:8080
-// @BasePath /api/v1
+// @BasePath /
 func main() {
 	e := echo.New()
 

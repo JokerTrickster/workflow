@@ -23,10 +23,10 @@ type RabbitMQConfig struct {
 
 // RabbitMQConnection represents a RabbitMQ connection
 type RabbitMQConnection struct {
-	conn     *amqp.Connection
-	channel  *amqp.Channel
-	config   *RabbitMQConfig
-	done     chan bool
+	conn    *amqp.Connection
+	channel *amqp.Channel
+	config  *RabbitMQConfig
+	done    chan bool
 }
 
 // WorkflowMessage represents a message from the queue
@@ -182,9 +182,9 @@ func (r *RabbitMQConnection) Close() error {
 func LoadRabbitMQConfigFromEnv() *RabbitMQConfig {
 	return &RabbitMQConfig{
 		URL:       getEnvOrDefault("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
-		QueueName: getEnvOrDefault("RABBITMQ_QUEUE_NAME", "workflow_queue"),
+		QueueName: getEnvOrDefault("RABBITMQ_QUEUE", "workflow_queue"),
 		Exchange:  getEnvOrDefault("RABBITMQ_EXCHANGE", ""),
-		Username:  getEnvOrDefault("RABBITMQ_USERNAME", "guest"),
+		Username:  getEnvOrDefault("RABBITMQ_USER", "guest"),
 		Password:  getEnvOrDefault("RABBITMQ_PASSWORD", "guest"),
 		Host:      getEnvOrDefault("RABBITMQ_HOST", "localhost"),
 		Port:      getEnvOrDefault("RABBITMQ_PORT", "5672"),
