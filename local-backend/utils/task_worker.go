@@ -28,6 +28,7 @@ type TaskWorker struct {
 
 // TaskMessage matches the structure from backend
 type TaskMessage struct {
+	RequestID      string `json:"request_id"`
 	Tasks          string `json:"tasks"`
 	RepositoryName string `json:"repository_name"`
 	WorkingDir     string `json:"working_dir,omitempty"`

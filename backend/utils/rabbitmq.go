@@ -15,6 +15,7 @@ type RabbitMQClient struct {
 
 // TaskMessage matches the ReqRunTasksClaude structure from local-backend
 type TaskMessage struct {
+	RequestID      string `json:"request_id"`                          // 요청 ID (DB 추적용)
 	Tasks          string `json:"tasks" validate:"required"`           // 실행할 작업 내용
 	RepositoryName string `json:"repository_name" validate:"required"` // 레포지토리 이름 (필수)
 	WorkingDir     string `json:"working_dir,omitempty"`               // 작업 디렉토리 (옵션)

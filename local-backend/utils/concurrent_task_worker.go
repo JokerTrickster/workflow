@@ -168,11 +168,30 @@ func (w *ConcurrentTaskWorker) handleMessageConcurrent(ctx context.Context, msg 
 		return
 	}
 
+	// Update task status to processing
+	if taskMsg.RequestID != "" {
+		if err := w.recordTaskProcessing(taskMsg.RequestID); err != nil {
+			log.Printf("Failed to update task status to processing: %v", err)
+		}
+	}
+
 	// Execute task
 	result, err := w.executeTaskConcurrent(ctx, &taskMsg)
 	if err != nil {
 		log.Printf("Failed to execute task: %v", err)
-		w.recordTaskFailure(&taskMsg, err.Error())
+		// Update task status to failed
+		if taskMsg.RequestID != "" {
+			failedResult := &AITaskResponse{
+				Success: false,
+				Error:   err.Error(),
+			}
+			if updateErr := w.updateTaskStatus(taskMsg.RequestID, "failed", failedResult); updateErr != nil {
+				log.Printf("Failed to update task status to failed: %v", updateErr)
+			}
+		} else {
+			// Fallback for tasks without RequestID
+			w.recordTaskFailure(&taskMsg, err.Error())
+		}
 		msg.Ack(false)
 		return
 	}
@@ -181,7 +200,16 @@ func (w *ConcurrentTaskWorker) handleMessageConcurrent(ctx context.Context, msg 
 	if w.shouldCommitChanges(result) {
 		if err := w.commitAndPushChanges(ctx, &taskMsg, result); err != nil {
 			log.Printf("Failed to commit and push changes: %v", err)
-			// Continue with PR creation even if commit/push fails
+			// Update task as failed if git operations fail
+			if taskMsg.RequestID != "" {
+				failedResult := &AITaskResponse{
+					Success: false,
+					Error:   fmt.Sprintf("Git operations failed: %v", err),
+				}
+				w.updateTaskStatus(taskMsg.RequestID, "failed", failedResult)
+			}
+			msg.Ack(false)
+			return
 		}
 	}
 
@@ -190,6 +218,13 @@ func (w *ConcurrentTaskWorker) handleMessageConcurrent(ctx context.Context, msg 
 		if err := w.createPullRequest(ctx, &taskMsg, result); err != nil {
 			log.Printf("Failed to create PR for completed task: %v", err)
 			// Still acknowledge the task as completed, PR creation is optional
+		}
+	}
+
+	// Update task status to completed
+	if taskMsg.RequestID != "" {
+		if err := w.recordTaskSuccess(taskMsg.RequestID, result); err != nil {
+			log.Printf("Failed to update task status to completed: %v", err)
 		}
 	}
 
@@ -533,4 +568,66 @@ func (w *ConcurrentTaskWorker) recordTaskFailure(taskMsg *TaskMessage, errorMsg 
 	} else {
 		log.Printf("Recorded task failure to database with request_id: %s", requestID)
 	}
+}
+
+// updateTaskStatus updates existing task status in database
+func (w *ConcurrentTaskWorker) updateTaskStatus(requestID string, status string, result *AITaskResponse) error {
+	if w.db == nil {
+		log.Printf("Database connection not available, skipping status update")
+		return fmt.Errorf("database connection not available")
+	}
+
+	updates := map[string]interface{}{
+		"status":     status,
+		"updated_at": time.Now(),
+	}
+
+	// Add completion data if completed successfully
+	if status == "completed" && result != nil {
+		now := time.Now()
+		updates["completed_at"] = now
+
+		if result.ExecutionTime > 0 {
+			processingTimeMs := result.ExecutionTime.Milliseconds()
+			updates["processing_time_ms"] = processingTimeMs
+		}
+
+		if result.Content != "" {
+			updates["result"] = result.Content
+		}
+	}
+
+	// Add failure data if failed
+	if status == "failed" && result != nil && result.Error != "" {
+		now := time.Now()
+		updates["completed_at"] = now
+		updates["error"] = result.Error
+
+		if result.ExecutionTime > 0 {
+			processingTimeMs := result.ExecutionTime.Milliseconds()
+			updates["processing_time_ms"] = processingTimeMs
+		}
+	}
+
+	err := w.db.Model(&mysql.WorkflowHistories{}).
+		Where("request_id = ?", requestID).
+		Updates(updates).Error
+
+	if err != nil {
+		log.Printf("Failed to update task status to '%s' for request_id %s: %v", status, requestID, err)
+		return err
+	}
+
+	log.Printf("Updated task status to '%s' for request_id: %s", status, requestID)
+	return nil
+}
+
+// recordTaskSuccess records successful task completion to database
+func (w *ConcurrentTaskWorker) recordTaskSuccess(requestID string, result *AITaskResponse) error {
+	return w.updateTaskStatus(requestID, "completed", result)
+}
+
+// recordTaskProcessing updates task status to processing
+func (w *ConcurrentTaskWorker) recordTaskProcessing(requestID string) error {
+	return w.updateTaskStatus(requestID, "processing", nil)
 }

@@ -5,6 +5,7 @@ import (
 	_interface "main/features/task/model/interface"
 	"main/features/task/model/request"
 	"main/features/task/model/response"
+	"main/utils"
 	"main/utils/db"
 	"time"
 
@@ -42,6 +43,23 @@ func (uc *CreateTaskUseCase) CreateTask(req *request.CreateTaskRequest) (*respon
 
 	if err := uc.createTaskRepo.CreateTask(task); err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
+	}
+
+	// Send task to RabbitMQ for processing
+	taskMessage := &utils.TaskMessage{
+		RequestID:      requestID,
+		Tasks:          req.Tasks,
+		RepositoryName: req.RepositoryName,
+		WorkingDir:     req.WorkingDir,
+		Interactive:    req.Interactive,
+		Cmd:            req.Cmd,
+		ContinueTask:   false, // Default to false for new tasks
+		Provider:       req.Provider,
+	}
+
+	if err := utils.PublishTask(taskMessage); err != nil {
+		// Log the error but don't fail the request - task is already saved in DB
+		fmt.Printf("Warning: Failed to publish task to RabbitMQ: %v\n", err)
 	}
 
 	return &response.CreateTaskResponse{

@@ -34,18 +34,23 @@ func (p *PRCreator) CreatePRForCompletedTask(ctx context.Context, taskMsg *TaskM
 		return fmt.Errorf("environment validation failed: %w", err)
 	}
 
-	// Step 2: Check if we're in the correct working directory
+	// Step 2: Determine working directory
 	workDir := p.workingDir
 	if taskMsg.WorkingDir != "" {
 		workDir = taskMsg.WorkingDir
 	}
 
-	if err := p.changeToWorkingDirectory(workDir); err != nil {
-		return fmt.Errorf("failed to change to working directory: %w", err)
+	// Convert to absolute path if needed
+	if workDir != "" {
+		absPath, err := filepath.Abs(workDir)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+		workDir = absPath
 	}
 
 	// Step 3: Check Git status and ensure we have changes
-	hasChanges, err := p.checkForChanges()
+	hasChanges, err := p.checkForChanges(workDir)
 	if err != nil {
 		return fmt.Errorf("failed to check for changes: %w", err)
 	}
@@ -56,15 +61,13 @@ func (p *PRCreator) CreatePRForCompletedTask(ctx context.Context, taskMsg *TaskM
 	}
 
 	// Step 4: Ensure we're on a feature branch (not main/master)
-	branchName, err := p.ensureFeatureBranch(taskMsg)
+	branchName, err := p.ensureFeatureBranch(taskMsg, workDir)
 	if err != nil {
 		return fmt.Errorf("failed to ensure feature branch: %w", err)
 	}
 
-	// Step 5: Commit changes
-	if err := p.commitChanges(taskMsg, result); err != nil {
-		return fmt.Errorf("failed to commit changes: %w", err)
-	}
+	// Note: Commit changes are already handled by concurrent_task_worker.commitAndPushChanges()
+	// Step 5: Skip duplicate commit - changes should already be committed
 
 	// Step 6: Push branch to GitHub
 	if err := p.pushBranch(branchName); err != nil {
@@ -128,9 +131,12 @@ func (p *PRCreator) changeToWorkingDirectory(workDir string) error {
 	return nil
 }
 
-// checkForChanges checks if there are uncommitted changes
-func (p *PRCreator) checkForChanges() (bool, error) {
+// checkForChanges checks if there are uncommitted changes in specific directory
+func (p *PRCreator) checkForChanges(workingDir string) (bool, error) {
 	cmd := exec.Command("git", "status", "--porcelain")
+	if workingDir != "" {
+		cmd.Dir = workingDir
+	}
 	output, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("failed to check git status: %w", err)
@@ -140,9 +146,12 @@ func (p *PRCreator) checkForChanges() (bool, error) {
 }
 
 // ensureFeatureBranch ensures we're on a feature branch, creates one if needed
-func (p *PRCreator) ensureFeatureBranch(taskMsg *TaskMessage) (string, error) {
+func (p *PRCreator) ensureFeatureBranch(taskMsg *TaskMessage, workingDir string) (string, error) {
 	// Get current branch
 	cmd := exec.Command("git", "branch", "--show-current")
+	if workingDir != "" {
+		cmd.Dir = workingDir
+	}
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current branch: %w", err)
@@ -160,6 +169,9 @@ func (p *PRCreator) ensureFeatureBranch(taskMsg *TaskMessage) (string, error) {
 	branchName := p.generateBranchName(taskMsg)
 
 	cmd = exec.Command("git", "checkout", "-b", branchName)
+	if workingDir != "" {
+		cmd.Dir = workingDir
+	}
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("failed to create feature branch %s: %w", branchName, err)
 	}
