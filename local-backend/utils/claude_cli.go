@@ -65,22 +65,10 @@ func (c *ClaudeProvider) ExecuteTask(ctx context.Context, request *AITaskRequest
 		defer cancel()
 	}
 
-	// Prepare working directory
-	workingDir := request.WorkingDir
-	if workingDir == "" {
-		workingDir = c.WorkingDir
-	}
-	if workingDir == "" {
-		var err error
-		workingDir, err = os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get current working directory: %w", err)
-		}
-	}
-
-	// Validate and create working directory if it doesn't exist
-	if err := c.ensureWorkingDirectory(workingDir); err != nil {
-		return nil, fmt.Errorf("failed to ensure working directory: %w", err)
+	// Prepare working directory - clone repository if needed
+	workingDir, err := c.prepareRepositoryWorkspace(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare repository workspace: %w", err)
 	}
 
 	// Build Claude CLI command
@@ -252,6 +240,83 @@ func (c *ClaudeProvider) GetClaudeVersion() (string, error) {
 		return "", fmt.Errorf("failed to get Claude version: %w", err)
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+// prepareRepositoryWorkspace clones repository and creates working branch
+func (c *ClaudeProvider) prepareRepositoryWorkspace(ctx context.Context, request *AITaskRequest) (string, error) {
+	// If no repository name, use fallback directory logic
+	if request.RepositoryName == "" {
+		workingDir := request.WorkingDir
+		if workingDir == "" {
+			workingDir = c.WorkingDir
+		}
+		if workingDir == "" {
+			var err error
+			workingDir, err = os.Getwd()
+			if err != nil {
+				return "", fmt.Errorf("failed to get current working directory: %w", err)
+			}
+		}
+		return workingDir, c.ensureWorkingDirectory(workingDir)
+	}
+
+	// Create a unique workspace for this task
+	timestamp := time.Now().Unix()
+	workspaceDir := fmt.Sprintf("/tmp/claude-workspace-%s-%d", request.RepositoryName, timestamp)
+
+	log.Printf("Creating workspace for repository %s at %s", request.RepositoryName, workspaceDir)
+
+	// Clone the repository
+	if err := c.cloneRepository(ctx, request.RepositoryName, workspaceDir); err != nil {
+		return "", fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	// Create and checkout a working branch
+	branchName := fmt.Sprintf("claude-task-%d", timestamp)
+	if err := c.createWorkingBranch(ctx, workspaceDir, branchName); err != nil {
+		log.Printf("Warning: failed to create branch %s: %v", branchName, err)
+		// Continue with main branch if branch creation fails
+	}
+
+	return workspaceDir, nil
+}
+
+// cloneRepository clones a GitHub repository
+func (c *ClaudeProvider) cloneRepository(ctx context.Context, repositoryName, targetDir string) error {
+	githubURL := fmt.Sprintf("https://github.com/%s.git", repositoryName)
+
+	log.Printf("Cloning repository %s to %s", githubURL, targetDir)
+
+	// Remove existing directory if it exists
+	if err := os.RemoveAll(targetDir); err != nil {
+		log.Printf("Failed to remove existing directory: %v", err)
+	}
+
+	// Clone the repository
+	cmd := exec.CommandContext(ctx, "git", "clone", githubURL, targetDir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to clone %s: %w\nOutput: %s", githubURL, err, string(output))
+	}
+
+	log.Printf("Successfully cloned repository %s", repositoryName)
+	return nil
+}
+
+// createWorkingBranch creates and checks out a new branch
+func (c *ClaudeProvider) createWorkingBranch(ctx context.Context, workingDir, branchName string) error {
+	log.Printf("Creating working branch: %s", branchName)
+
+	cmd := exec.CommandContext(ctx, "git", "checkout", "-b", branchName)
+	cmd.Dir = workingDir
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create branch %s: %w\nOutput: %s", branchName, err, string(output))
+	}
+
+	log.Printf("Successfully created and switched to branch: %s", branchName)
+	return nil
 }
 
 // ensureWorkingDirectory creates the working directory if it doesn't exist

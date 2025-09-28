@@ -327,21 +327,12 @@ func (w *ConcurrentTaskWorker) commitAndPushChanges(ctx context.Context, taskMsg
 		return fmt.Errorf("working directory is required for Git operations")
 	}
 
-	// Check if it's a Git repository, if not try to initialize or clone
+	// Validate that this is a Git repository (Claude provider should have set this up)
 	gitDir := filepath.Join(workingDir, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		log.Printf("Not a Git repository: %s", workingDir)
-
-		// Try to clone the repository if repository name is provided
-		if taskMsg.RepositoryName != "" {
-			if err := w.cloneOrInitRepository(ctx, taskMsg.RepositoryName, workingDir); err != nil {
-				log.Printf("Failed to setup Git repository: %v", err)
-				return nil // Don't fail the task, just skip Git operations
-			}
-		} else {
-			log.Printf("No repository name provided, skipping Git operations")
-			return nil
-		}
+		log.Printf("Working directory is not a Git repository: %s", workingDir)
+		log.Printf("This indicates the Claude provider didn't set up the repository correctly")
+		return nil // Don't fail the task, just skip Git operations
 	}
 
 	// Add all changes
