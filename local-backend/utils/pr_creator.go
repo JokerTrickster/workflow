@@ -229,8 +229,8 @@ func (p *PRCreator) generateCommitMessage(taskMsg *TaskMessage, result *AITaskRe
 	if result != nil {
 		commitMsg += fmt.Sprintf("- Execution time: %v\n", result.ExecutionTime)
 		commitMsg += fmt.Sprintf("- Provider: %s\n", taskMsg.Provider)
-		if result.FilesModified > 0 {
-			commitMsg += fmt.Sprintf("- Files modified: %d\n", result.FilesModified)
+		if len(result.FilesModified) > 0 {
+			commitMsg += fmt.Sprintf("- Files modified: %d\n", len(result.FilesModified))
 		}
 		if result.TokensUsed > 0 {
 			commitMsg += fmt.Sprintf("- Tokens used: %d\n", result.TokensUsed)
@@ -308,8 +308,8 @@ func (p *PRCreator) generatePRBody(taskMsg *TaskMessage, result *AITaskResponse)
 		body += fmt.Sprintf("- **Execution Time**: %v\n", result.ExecutionTime)
 		body += fmt.Sprintf("- **Success**: %t\n", result.Success)
 
-		if result.FilesModified > 0 {
-			body += fmt.Sprintf("- **Files Modified**: %d\n", result.FilesModified)
+		if len(result.FilesModified) > 0 {
+			body += fmt.Sprintf("- **Files Modified**: %d\n", len(result.FilesModified))
 		}
 
 		if result.TokensUsed > 0 {

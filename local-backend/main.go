@@ -54,15 +54,9 @@ func main() {
 	}
 
 	// Initialize Task Worker for RabbitMQ consumption
-	rabbitMQURL := os.Getenv("RABBITMQ_URL")
-	if rabbitMQURL == "" {
-		rabbitMQURL = "amqp://guest:guest@localhost:5672/"
-	}
-
-	queueName := os.Getenv("RABBITMQ_QUEUE_NAME")
-	if queueName == "" {
-		queueName = "claude_tasks"
-	}
+	rabbitMQConfig := utils.LoadRabbitMQConfigFromEnv()
+	rabbitMQURL := rabbitMQConfig.URL
+	queueName := rabbitMQConfig.QueueName
 
 	// Get max concurrent workers from environment (default 3)
 	maxConcurrent := 3

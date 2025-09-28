@@ -21,6 +21,7 @@ func NewTaskHandler(e *echo.Echo) {
 	cancelTaskUC := usecase.NewCancelTaskUseCase(cancelTaskRepo)
 	listTasksUC := usecase.NewListTasksUseCase(listTasksRepo)
 	getTaskStatusUC := usecase.NewGetTaskStatusUseCase(getTaskStatusRepo)
+	getTaskUC := usecase.NewGetTaskUseCase(getTaskStatusRepo)
 
 	// 각 API Handler 초기화
 	NewCreateTaskHandler(e, createTaskUC)
@@ -28,4 +29,5 @@ func NewTaskHandler(e *echo.Echo) {
 	NewCancelTaskHandler(e, cancelTaskUC)
 	NewListTasksHandler(e, listTasksUC)
 	NewGetTaskStatusHandler(e, getTaskStatusUC)
+	NewGetTaskHandler(e, getTaskUC)
 }

@@ -60,9 +60,9 @@ func InitConfig() error {
 		RabbitMQ: RabbitMQConfig{
 			QueueName: getEnv("RABBITMQ_QUEUE_NAME", "workflow_queue"),
 			Exchange:  getEnv("RABBITMQ_EXCHANGE", ""),
-			Username:  getEnv("RABBITMQ_USER", "guest"),
-			Password:  getEnv("RABBITMQ_PASSWORD", "guest"),
-			Host:      getEnv("RABBITMQ_HOST", "localhost"),
+			Username:  getEnv("RABBITMQ_USER", "board"),
+			Password:  getEnv("RABBITMQ_PASSWORD", "examplepassword"),
+			Host:      getEnv("RABBITMQ_HOST", "13.203.37.93"),
 			Port:      getEnv("RABBITMQ_PORT", "5672"),
 		},
 		Server: ServerConfig{
