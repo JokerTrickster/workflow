@@ -30,6 +30,12 @@ type WorkflowHistories struct {
 	// 결과 정보
 	Result *string `json:"result,omitempty" gorm:"column:result;type:text"`
 	Error  *string `json:"error,omitempty" gorm:"column:error;type:text"`
+
+	// Git workflow 정보
+	GitHubIssueURL *string `json:"github_issue_url,omitempty" gorm:"column:github_issue_url"`
+	GitHubPRURL    *string `json:"github_pr_url,omitempty" gorm:"column:github_pr_url"`
+	BranchName     *string `json:"branch_name,omitempty" gorm:"column:branch_name"`
+	CleanupStatus  *string `json:"cleanup_status,omitempty" gorm:"column:cleanup_status;default:pending"`
 }
 
 func (WorkflowHistories) TableName() string {

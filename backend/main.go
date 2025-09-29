@@ -18,7 +18,7 @@ import (
 // @title Workflow Backend API
 // @version 1.0
 // @description This is a workflow management backend server API
-// @host localhost:8080
+// @host localhost:7000
 // @BasePath /
 func main() {
 	e := echo.New()
@@ -56,7 +56,7 @@ func main() {
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
-		port = "8080"
+		port = "7000"
 	}
 
 	// Start server

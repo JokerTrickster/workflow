@@ -38,11 +38,11 @@ var GlobalConfig *Config
 
 func InitConfig() error {
 	// Build MySQL DSN from individual components
-	dbHost := getEnv("MYSQL_HOST", "localhost")
+	dbHost := getEnv("MYSQL_HOST", "13.203.37.93")
 	dbPort := getEnv("MYSQL_PORT", "3306")
 	dbName := getEnv("MYSQL_DATABASE", "dev_workflow")
 	dbUser := getEnv("MYSQL_USER", "root")
-	dbPassword := getEnv("MYSQL_PASSWORD", "")
+	dbPassword := getEnv("MYSQL_PASSWORD", "examplepassword")
 
 	// MySQL DSN format: user:password@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
 	mysqlDSN := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
@@ -67,7 +67,7 @@ func InitConfig() error {
 		},
 		Server: ServerConfig{
 			Host: getEnv("SERVER_HOST", "localhost"),
-			Port: getEnv("SERVER_PORT", "8080"),
+			Port: getEnv("SERVER_PORT", "7000"),
 		},
 	}
 

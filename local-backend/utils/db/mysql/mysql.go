@@ -71,6 +71,12 @@ func InitMySQL() error {
 	// gen 패키지를 사용하여 쿼리를 생성할 때 사용할 DB를 설정
 	// SetDefault(GormMysqlDB)
 
+	// Auto-migrate workflow histories table to add new Git workflow columns
+	if err := GormMysqlDB.AutoMigrate(&WorkflowHistories{}); err != nil {
+		fmt.Printf("Failed to auto-migrate WorkflowHistories table: %v\n", err)
+		return err
+	}
+
 	return nil
 }
 

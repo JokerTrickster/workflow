@@ -110,7 +110,7 @@ definitions:
       working_dir:
         type: string
     type: object
-host: localhost:8080
+host: localhost:7000
 info:
   contact: {}
   description: This is a workflow management backend server API

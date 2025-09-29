@@ -4,29 +4,39 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"main/features/github/model/response"
+	"main/features/github/service"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 )
 
 // PRCreator handles GitHub Pull Request creation for completed tasks
 type PRCreator struct {
-	workingDir string
-	repoName   string
+	workingDir    string
+	repoName      string
+	githubService *service.GitHubService
+	githubToken   string
 }
 
 // NewPRCreator creates a new PR creator instance
 func NewPRCreator(workingDir, repoName string) *PRCreator {
 	return &PRCreator{
-		workingDir: workingDir,
-		repoName:   repoName,
+		workingDir:    workingDir,
+		repoName:      repoName,
+		githubService: service.NewGitHubService(),
+		githubToken:   os.Getenv("GITHUB_TOKEN"),
 	}
 }
 
 // CreatePRForCompletedTask creates a GitHub PR for a completed task
 func (p *PRCreator) CreatePRForCompletedTask(ctx context.Context, taskMsg *TaskMessage, result *AITaskResponse) error {
+	return p.CreatePRForCompletedTaskWithIssue(ctx, taskMsg, result, "")
+}
+
+// CreatePRForCompletedTaskWithIssue creates a GitHub PR for a completed task with issue linking
+func (p *PRCreator) CreatePRForCompletedTaskWithIssue(ctx context.Context, taskMsg *TaskMessage, result *AITaskResponse, issueNumber string) error {
 	log.Printf("Starting PR creation process for task: %s", taskMsg.Tasks)
 
 	// Step 1: Validate environment and repository
@@ -51,52 +61,43 @@ func (p *PRCreator) CreatePRForCompletedTask(ctx context.Context, taskMsg *TaskM
 	}
 
 	if !hasChanges {
-		log.Printf("No changes detected, skipping PR creation")
+		log.Printf("No changes detected, skipping PR creation for task: %s", taskMsg.Tasks)
 		return nil
 	}
 
-	// Step 4: Ensure we're on a feature branch (not main/master)
-	branchName, err := p.ensureFeatureBranch(taskMsg)
+	// Step 4: Get current branch name
+	branchName, err := p.getCurrentBranch()
 	if err != nil {
-		return fmt.Errorf("failed to ensure feature branch: %w", err)
+		return fmt.Errorf("failed to get current branch: %w", err)
 	}
 
-	// Step 5: Commit changes
-	if err := p.commitChanges(taskMsg, result); err != nil {
-		return fmt.Errorf("failed to commit changes: %w", err)
+	log.Printf("Current branch: %s", branchName)
+
+	// Step 5: Ensure changes are committed and pushed
+	if err := p.ensureChangesPushed(branchName); err != nil {
+		return fmt.Errorf("failed to ensure changes are pushed: %w", err)
 	}
 
-	// Step 6: Push branch to GitHub
-	if err := p.pushBranch(branchName); err != nil {
-		return fmt.Errorf("failed to push branch: %w", err)
-	}
-
-	// Step 7: Create Pull Request
-	prURL, err := p.createGitHubPR(taskMsg, branchName, result)
+	// Step 6: Create GitHub Pull Request
+	prURL, err := p.createGitHubPRWithIssue(taskMsg, branchName, result, issueNumber)
 	if err != nil {
 		return fmt.Errorf("failed to create GitHub PR: %w", err)
 	}
 
-	log.Printf("Successfully created PR: %s", prURL)
+	log.Printf("Successfully created PR for task '%s': %s", taskMsg.Tasks, prURL)
 	return nil
 }
 
-// validateEnvironment checks if required tools are available
+// validateEnvironment checks if all necessary tools are available
 func (p *PRCreator) validateEnvironment() error {
-	// Check if gh CLI is available
-	if _, err := exec.LookPath("gh"); err != nil {
-		return fmt.Errorf("GitHub CLI (gh) not found. Install it from https://cli.github.com/")
-	}
-
-	// Check if git is available
+	// Check if we have git
 	if _, err := exec.LookPath("git"); err != nil {
-		return fmt.Errorf("git not found")
+		return fmt.Errorf("git command not found: %w", err)
 	}
 
-	// Check if gh is authenticated
-	cmd := exec.Command("gh", "auth", "status")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("GitHub CLI not authenticated. Run 'gh auth login'")
+	// Check if we have gh CLI (optional, we have API fallback)
+	if _, err := exec.LookPath("gh"); err != nil {
+		log.Printf("Warning: GitHub CLI not found, will use API only")
 	}
 
 	return nil
@@ -105,148 +106,98 @@ func (p *PRCreator) validateEnvironment() error {
 // changeToWorkingDirectory changes to the specified working directory
 func (p *PRCreator) changeToWorkingDirectory(workDir string) error {
 	if workDir == "" {
-		return nil
-	}
-
-	// Convert to absolute path
-	absPath, err := filepath.Abs(workDir)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path: %w", err)
+		return fmt.Errorf("working directory not specified")
 	}
 
 	// Check if directory exists
-	if _, err := os.Stat(absPath); os.IsNotExist(err) {
-		return fmt.Errorf("working directory does not exist: %s", absPath)
+	if _, err := os.Stat(workDir); os.IsNotExist(err) {
+		return fmt.Errorf("working directory does not exist: %s", workDir)
 	}
 
 	// Change to directory
-	if err := os.Chdir(absPath); err != nil {
-		return fmt.Errorf("failed to change directory: %w", err)
+	if err := os.Chdir(workDir); err != nil {
+		return fmt.Errorf("failed to change to directory %s: %w", workDir, err)
 	}
 
-	log.Printf("Changed to working directory: %s", absPath)
+	// Update working directory reference
+	p.workingDir = workDir
+
+	log.Printf("Changed to working directory: %s", workDir)
 	return nil
 }
 
-// checkForChanges checks if there are uncommitted changes
+// checkForChanges verifies if there are any Git changes to commit
 func (p *PRCreator) checkForChanges() (bool, error) {
 	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = p.workingDir
+
 	output, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("failed to check git status: %w", err)
 	}
 
-	return len(strings.TrimSpace(string(output))) > 0, nil
+	hasChanges := len(strings.TrimSpace(string(output))) > 0
+	log.Printf("Git status check - has changes: %t", hasChanges)
+
+	return hasChanges, nil
 }
 
-// ensureFeatureBranch ensures we're on a feature branch, creates one if needed
-func (p *PRCreator) ensureFeatureBranch(taskMsg *TaskMessage) (string, error) {
-	// Get current branch
+// getCurrentBranch gets the current Git branch name
+func (p *PRCreator) getCurrentBranch() (string, error) {
 	cmd := exec.Command("git", "branch", "--show-current")
+	cmd.Dir = p.workingDir
+
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current branch: %w", err)
 	}
 
-	currentBranch := strings.TrimSpace(string(output))
-
-	// If already on a feature branch, use it
-	if !isDefaultBranch(currentBranch) {
-		log.Printf("Already on feature branch: %s", currentBranch)
-		return currentBranch, nil
+	branchName := strings.TrimSpace(string(output))
+	if branchName == "" {
+		return "", fmt.Errorf("unable to determine current branch")
 	}
 
-	// Create a new feature branch
-	branchName := p.generateBranchName(taskMsg)
-
-	cmd = exec.Command("git", "checkout", "-b", branchName)
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to create feature branch %s: %w", branchName, err)
-	}
-
-	log.Printf("Created and switched to feature branch: %s", branchName)
 	return branchName, nil
 }
 
-// isDefaultBranch checks if the branch is a default branch (main/master)
-func isDefaultBranch(branch string) bool {
-	return branch == "main" || branch == "master"
-}
-
-// generateBranchName creates a branch name based on the task
-func (p *PRCreator) generateBranchName(taskMsg *TaskMessage) string {
-	// Extract task type and description from task content
-	taskDescription := strings.ToLower(taskMsg.Tasks)
-
-	// Simple branch name generation
-	timestamp := time.Now().Format("0102-1504") // MMDD-HHMM
-
-	// Clean up task description for branch name
-	cleaned := strings.ReplaceAll(taskDescription, " ", "-")
-	cleaned = strings.ReplaceAll(cleaned, ":", "")
-	cleaned = strings.ReplaceAll(cleaned, ".", "")
-
-	// Limit length
-	if len(cleaned) > 30 {
-		cleaned = cleaned[:30]
+// ensureChangesPushed makes sure all changes are committed and pushed
+func (p *PRCreator) ensureChangesPushed(branchName string) error {
+	// Check if there are uncommitted changes
+	hasUncommitted, err := p.checkForChanges()
+	if err != nil {
+		return fmt.Errorf("failed to check for uncommitted changes: %w", err)
 	}
 
-	return fmt.Sprintf("task/%s-%s", cleaned, timestamp)
-}
-
-// commitChanges commits the changes with a descriptive message
-func (p *PRCreator) commitChanges(taskMsg *TaskMessage, result *AITaskResponse) error {
-	// Stage all changes
-	cmd := exec.Command("git", "add", ".")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to stage changes: %w", err)
+	if hasUncommitted {
+		log.Printf("Found uncommitted changes, but they should have been committed by the task worker")
+		// Don't auto-commit here, let the task worker handle this
 	}
 
-	// Create commit message
-	commitMsg := p.generateCommitMessage(taskMsg, result)
+	// Check if branch exists on remote
+	cmd := exec.Command("git", "ls-remote", "--heads", "origin", branchName)
+	cmd.Dir = p.workingDir
 
-	// Commit changes
-	cmd = exec.Command("git", "commit", "-m", commitMsg)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to commit changes: %w", err)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to check remote branch: %w", err)
 	}
 
-	log.Printf("Committed changes with message: %s", commitMsg)
+	if len(strings.TrimSpace(string(output))) == 0 {
+		log.Printf("Branch %s doesn't exist on remote, pushing...", branchName)
+		return p.pushBranch(branchName)
+	}
+
+	log.Printf("Branch %s already exists on remote", branchName)
 	return nil
 }
 
-// generateCommitMessage creates a descriptive commit message
-func (p *PRCreator) generateCommitMessage(taskMsg *TaskMessage, result *AITaskResponse) string {
-	// Base commit message on task content
-	taskSummary := taskMsg.Tasks
-	if len(taskSummary) > 100 {
-		taskSummary = taskSummary[:100] + "..."
-	}
-
-	commitMsg := fmt.Sprintf("feat: %s\n\n", taskSummary)
-
-	// Add execution details
-	if result != nil {
-		commitMsg += fmt.Sprintf("- Execution time: %v\n", result.ExecutionTime)
-		commitMsg += fmt.Sprintf("- Provider: %s\n", taskMsg.Provider)
-		if len(result.FilesModified) > 0 {
-			commitMsg += fmt.Sprintf("- Files modified: %d\n", len(result.FilesModified))
-		}
-		if result.TokensUsed > 0 {
-			commitMsg += fmt.Sprintf("- Tokens used: %d\n", result.TokensUsed)
-		}
-	}
-
-	commitMsg += "\n🤖 Generated with Claude Code Workflow System\n"
-	commitMsg += "Co-Authored-By: Claude <noreply@anthropic.com>"
-
-	return commitMsg
-}
-
-// pushBranch pushes the branch to GitHub
+// pushBranch pushes the current branch to GitHub
 func (p *PRCreator) pushBranch(branchName string) error {
-	// Push branch with upstream tracking
-	cmd := exec.Command("git", "push", "-u", "origin", branchName)
+	log.Printf("Pushing branch to GitHub: %s", branchName)
+
+	cmd := exec.Command("git", "push", "--set-upstream", "origin", branchName)
+	cmd.Dir = p.workingDir
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to push branch %s: %w", branchName, err)
 	}
@@ -255,29 +206,116 @@ func (p *PRCreator) pushBranch(branchName string) error {
 	return nil
 }
 
-// createGitHubPR creates a Pull Request using GitHub CLI
-func (p *PRCreator) createGitHubPR(taskMsg *TaskMessage, branchName string, result *AITaskResponse) (string, error) {
+// createGitHubPRWithIssue creates a Pull Request using GitHub API or CLI fallback
+func (p *PRCreator) createGitHubPRWithIssue(taskMsg *TaskMessage, branchName string, result *AITaskResponse, issueNumber string) (string, error) {
+	// Try GitHub API first
+	if p.githubToken != "" && p.githubService != nil {
+		prURL, err := p.createPRWithAPI(taskMsg, branchName, result, issueNumber)
+		if err == nil {
+			return prURL, nil
+		}
+		log.Printf("GitHub API PR creation failed, falling back to CLI: %v", err)
+	}
+
+	// Fallback to GitHub CLI
+	return p.createPRWithCLI(taskMsg, branchName, result, issueNumber)
+}
+
+// createPRWithAPI creates a Pull Request using the GitHub API
+func (p *PRCreator) createPRWithAPI(taskMsg *TaskMessage, branchName string, result *AITaskResponse, issueNumber string) (string, error) {
+	// Parse repository name
+	parts := strings.Split(taskMsg.RepositoryName, "/")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid repository name format: %s", taskMsg.RepositoryName)
+	}
+	owner, repo := parts[0], parts[1]
+
+	// Get default branch
+	defaultBranch, err := p.getDefaultBranch()
+	if err != nil {
+		log.Printf("Warning: failed to get default branch, using 'main': %v", err)
+		defaultBranch = "main"
+	}
+
 	// Generate PR title and body
 	title := p.generatePRTitle(taskMsg)
-	body := p.generatePRBody(taskMsg, result)
+	body := p.generatePRBodyWithIssue(taskMsg, result, issueNumber)
+
+	// Create PR request
+	prReq := &response.CreatePullRequestRequest{
+		Title: title,
+		Body:  &body,
+		Head:  branchName,
+		Base:  defaultBranch,
+	}
+
+	// Create the pull request
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	pr, err := p.githubService.CreatePullRequest(ctx, p.githubToken, owner, repo, prReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to create PR with API: %w", err)
+	}
+
+	log.Printf("Created GitHub PR #%d with API: %s", pr.Number, pr.HTMLURL)
+	return pr.HTMLURL, nil
+}
+
+// createPRWithCLI creates a Pull Request using GitHub CLI
+func (p *PRCreator) createPRWithCLI(taskMsg *TaskMessage, branchName string, result *AITaskResponse, issueNumber string) (string, error) {
+	// Generate PR title and body
+	title := p.generatePRTitle(taskMsg)
+	body := p.generatePRBodyWithIssue(taskMsg, result, issueNumber)
+
+	// Get default branch
+	defaultBranch, err := p.getDefaultBranch()
+	if err != nil {
+		log.Printf("Warning: failed to get default branch, using 'main': %v", err)
+		defaultBranch = "main"
+	}
 
 	// Create PR using gh CLI
 	cmd := exec.Command("gh", "pr", "create",
 		"--title", title,
 		"--body", body,
 		"--head", branchName,
-		"--base", "main", // or get default branch dynamically
+		"--base", defaultBranch,
 	)
 
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to create PR: %w", err)
+		return "", fmt.Errorf("failed to create PR with CLI: %w", err)
 	}
 
 	prURL := strings.TrimSpace(string(output))
-	log.Printf("Created GitHub PR: %s", prURL)
+	log.Printf("Created GitHub PR with CLI: %s", prURL)
 
 	return prURL, nil
+}
+
+// getDefaultBranch determines the default branch of the repository
+func (p *PRCreator) getDefaultBranch() (string, error) {
+	// Try to get default branch from Git
+	cmd := exec.Command("git", "remote", "show", "origin")
+	cmd.Dir = p.workingDir
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "HEAD branch:") {
+			parts := strings.Split(line, ":")
+			if len(parts) == 2 {
+				return strings.TrimSpace(parts[1]), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("could not determine default branch")
 }
 
 // generatePRTitle creates a PR title based on the task
@@ -292,7 +330,17 @@ func (p *PRCreator) generatePRTitle(taskMsg *TaskMessage) string {
 
 // generatePRBody creates a detailed PR description
 func (p *PRCreator) generatePRBody(taskMsg *TaskMessage, result *AITaskResponse) string {
+	return p.generatePRBodyWithIssue(taskMsg, result, "")
+}
+
+// generatePRBodyWithIssue creates a detailed PR description with issue linking
+func (p *PRCreator) generatePRBodyWithIssue(taskMsg *TaskMessage, result *AITaskResponse, issueNumber string) string {
 	body := fmt.Sprintf("## Task Description\n%s\n\n", taskMsg.Tasks)
+
+	// Add issue link if provided
+	if issueNumber != "" {
+		body += fmt.Sprintf("Closes #%s\n\n", issueNumber)
+	}
 
 	body += "## Implementation Details\n"
 	body += fmt.Sprintf("- **Repository**: %s\n", taskMsg.RepositoryName)

@@ -21,6 +21,13 @@ type Task struct {
 	ProcessingTimeMs *int64     `json:"processing_time_ms,omitempty" gorm:"column:processing_time_ms"`
 	Result           *string    `json:"result,omitempty" gorm:"column:result;type:text"`
 	Error            *string    `json:"error,omitempty" gorm:"column:error;type:text"`
+
+	// GitHub Integration Fields
+	GitHubIssueURL   *string    `json:"github_issue_url,omitempty" gorm:"column:github_issue_url"`
+	GitHubPRURL      *string    `json:"github_pr_url,omitempty" gorm:"column:github_pr_url"`
+	BranchName       *string    `json:"branch_name,omitempty" gorm:"column:branch_name"`
+	CleanupStatus    *string    `json:"cleanup_status,omitempty" gorm:"column:cleanup_status"`
+	ContinueTask     bool       `json:"continue_task" gorm:"column:continue_task;default:false"`
 }
 
 // TableName specifies the table name for Task model

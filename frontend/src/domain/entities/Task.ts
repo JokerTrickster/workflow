@@ -15,4 +15,10 @@ export interface Task {
   lint_status?: 'pending' | 'success' | 'failed';
   ai_tokens_used?: number;
   error_message?: string;
+
+  // GitHub Integration Fields
+  github_issue_url?: string;
+  github_pr_url?: string;
+  cleanup_status?: string;
+  continue_task?: boolean;
 }

@@ -83,8 +83,13 @@ export function useTaskHistory(): UseTaskHistoryResult {
 
     try {
       const response = await claudeService.getTaskHistory(repositoryName, mergedParams);
-      setTasks(response.data);
-      setPagination(response.pagination);
+      setTasks(response.tasks);
+      setPagination({
+        page: response.page,
+        limit: response.limit,
+        total: response.total_count,
+        total_pages: Math.ceil(response.total_count / response.limit)
+      });
       setState({
         repositoryName,
         params: mergedParams

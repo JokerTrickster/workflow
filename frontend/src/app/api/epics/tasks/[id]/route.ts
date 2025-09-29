@@ -76,7 +76,7 @@ export async function POST(
   try {
 
     // Call the backend API to execute the task
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
+    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000/api/v1';
     const executeUrl = `${backendUrl}/tasks/${id}/execute`;
 
     const response = await fetch(executeUrl, {

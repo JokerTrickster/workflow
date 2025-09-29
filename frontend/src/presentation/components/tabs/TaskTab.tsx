@@ -333,7 +333,7 @@ Task created on ${new Date().toISOString()}`;
       console.log('Executing task:', taskToExecute.id);
 
       // Use direct API call with explicit POST method
-      const response = await fetch(`http://localhost:8080/api/v1/tasks/${taskToExecute.id}/execute`, {
+      const response = await fetch(`http://localhost:7000/api/v1/tasks/${taskToExecute.id}/execute`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -655,8 +655,22 @@ Task created on ${new Date().toISOString()}`;
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                  {task.github_issue_url && (
+                    <Button variant="outline" size="sm" asChild title="View GitHub Issue">
+                      <a href={task.github_issue_url} target="_blank" rel="noopener noreferrer">
+                        <MessageCircle className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  )}
+                  {task.github_pr_url && (
+                    <Button variant="outline" size="sm" asChild title="View Pull Request">
+                      <a href={task.github_pr_url} target="_blank" rel="noopener noreferrer">
+                        <GitPullRequest className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  )}
                   {task.pr_url && (
-                    <Button variant="outline" size="sm" asChild>
+                    <Button variant="outline" size="sm" asChild title="Legacy PR Link">
                       <a href={task.pr_url} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="h-4 w-4" />
                       </a>
@@ -687,7 +701,54 @@ Task created on ${new Date().toISOString()}`;
                       Build: {task.build_status}
                     </Badge>
                   )}
+                  {task.provider && (
+                    <div className="flex items-center gap-1">
+                      <User className="h-3 w-3" />
+                      {task.provider}
+                    </div>
+                  )}
+                  {task.cleanup_status && (
+                    <Badge variant="outline" className="text-xs">
+                      Cleanup: {task.cleanup_status}
+                    </Badge>
+                  )}
                 </div>
+
+                {/* GitHub Integration Status */}
+                {(task.github_issue_url || task.github_pr_url || task.branch_name) && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <div className="flex flex-wrap items-center gap-3 text-xs">
+                      {task.github_issue_url && (
+                        <a
+                          href={task.github_issue_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                        >
+                          <MessageCircle className="h-3 w-3" />
+                          Issue
+                        </a>
+                      )}
+                      {task.github_pr_url && (
+                        <a
+                          href={task.github_pr_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-green-600 hover:text-green-800"
+                        >
+                          <GitPullRequest className="h-3 w-3" />
+                          Pull Request
+                        </a>
+                      )}
+                      {task.branch_name && (
+                        <div className="flex items-center gap-1 text-gray-600">
+                          <GitBranch className="h-3 w-3" />
+                          {task.branch_name}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             )}
           </Card>

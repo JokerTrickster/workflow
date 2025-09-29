@@ -50,6 +50,12 @@ export interface WorkflowHistory {
   processing_time_ms?: number;
   result?: string;
   error?: string;
+
+  // GitHub Integration Fields
+  github_issue_url?: string;
+  github_pr_url?: string;
+  branch_name?: string;
+  cleanup_status?: string;
 }
 
 export interface PaginationMeta {

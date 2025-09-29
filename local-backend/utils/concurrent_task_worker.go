@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"main/features/github/model/response"
+	"main/features/github/service"
 	"main/utils/db/mysql"
 	"os"
 	"os/exec"
@@ -34,6 +36,16 @@ type ConcurrentTaskWorker struct {
 	semaphore       chan struct{}
 	wg              sync.WaitGroup
 	mutex           sync.RWMutex // Protect shared state
+
+	// GitHub integration
+	githubService   *service.GitHubService
+	githubToken     string
+
+	// Branch management
+	branchManager   *BranchManager
+
+	// Error handling
+	errorHandler    *ErrorHandler
 }
 
 // NewConcurrentTaskWorker creates a new concurrent task worker
@@ -61,6 +73,10 @@ func NewConcurrentTaskWorker(rabbitMQURL, queueName string, maxConcurrent int) *
 		db:              db,
 		maxConcurrent:   maxConcurrent,
 		semaphore:       make(chan struct{}, maxConcurrent),
+		githubService:   service.NewGitHubService(),
+		githubToken:     os.Getenv("GITHUB_TOKEN"),
+		branchManager:   GetGlobalBranchManager(),
+		errorHandler:    GetGlobalErrorHandler(),
 	}
 }
 
@@ -168,27 +184,78 @@ func (w *ConcurrentTaskWorker) handleMessageConcurrent(ctx context.Context, msg 
 		return
 	}
 
+	// Create GitHub issue before task execution
+	issueURL, issueNumber, err := w.createGitHubIssue(ctx, &taskMsg)
+	if err != nil {
+		log.Printf("Warning: Failed to create GitHub issue: %v", err)
+		// Continue with task execution even if issue creation fails
+	}
+
+	// Create task branch with conflict prevention
+	branchInfo, err := w.branchManager.CreateTaskBranch(ctx, &taskMsg)
+	if err != nil {
+		log.Printf("Warning: Failed to create task branch: %v", err)
+		// Continue with task execution on current branch
+	}
+
 	// Execute task
 	result, err := w.executeTaskConcurrent(ctx, &taskMsg)
 	if err != nil {
 		log.Printf("Failed to execute task: %v", err)
+
+		// Handle error with comprehensive error handling
+		taskErr := w.errorHandler.ClassifyError(err, &taskMsg)
+		if handleErr := w.errorHandler.HandleTaskError(ctx, taskErr); handleErr != nil {
+			log.Printf("Error handling failed: %v", handleErr)
+		}
+
 		w.recordTaskFailure(&taskMsg, err.Error())
+
+		// Mark branch as completed (failed)
+		if branchInfo != nil {
+			w.branchManager.CompleteBranch(taskMsg.RepositoryName, false)
+		}
+
 		msg.Ack(false)
 		return
+	}
+
+	// Record successful task completion to database
+	w.recordTaskSuccess(&taskMsg, result, issueURL)
+
+	// Mark branch as completed
+	if branchInfo != nil {
+		w.branchManager.CompleteBranch(taskMsg.RepositoryName, true)
 	}
 
 	// Handle successful completion - commit and push changes first
 	if w.shouldCommitChanges(result) {
 		if err := w.commitAndPushChanges(ctx, &taskMsg, result); err != nil {
 			log.Printf("Failed to commit and push changes: %v", err)
+
+			// Handle Git operation errors
+			taskErr := w.errorHandler.ClassifyError(err, &taskMsg)
+			if taskErr.Type == ErrorTypeGit && taskErr.Recoverable {
+				if handleErr := w.errorHandler.HandleTaskError(ctx, taskErr); handleErr != nil {
+					log.Printf("Git error handling failed: %v", handleErr)
+				}
+			}
 			// Continue with PR creation even if commit/push fails
 		}
 	}
 
 	// Check if PR needed after committing changes
 	if w.shouldCreatePR(result) {
-		if err := w.createPullRequest(ctx, &taskMsg, result); err != nil {
+		if err := w.createPullRequest(ctx, &taskMsg, result, issueNumber); err != nil {
 			log.Printf("Failed to create PR for completed task: %v", err)
+
+			// Handle PR creation errors
+			taskErr := w.errorHandler.ClassifyError(err, &taskMsg)
+			if taskErr.Recoverable {
+				if handleErr := w.errorHandler.HandleTaskError(ctx, taskErr); handleErr != nil {
+					log.Printf("PR error handling failed: %v", handleErr)
+				}
+			}
 			// Still acknowledge the task as completed, PR creation is optional
 		}
 	}
@@ -437,14 +504,14 @@ func (w *ConcurrentTaskWorker) cloneOrInitRepository(ctx context.Context, reposi
 }
 
 // createPullRequest creates a GitHub PR for completed tasks
-func (w *ConcurrentTaskWorker) createPullRequest(ctx context.Context, taskMsg *TaskMessage, result *AITaskResponse) error {
+func (w *ConcurrentTaskWorker) createPullRequest(ctx context.Context, taskMsg *TaskMessage, result *AITaskResponse, issueNumber string) error {
 	log.Printf("Creating PR for completed task: %s", taskMsg.Tasks)
 
 	// Create PR creator instance
 	prCreator := NewPRCreator(taskMsg.WorkingDir, taskMsg.RepositoryName)
 
-	// Create the pull request
-	if err := prCreator.CreatePRForCompletedTask(ctx, taskMsg, result); err != nil {
+	// Create the pull request with issue linking
+	if err := prCreator.CreatePRForCompletedTaskWithIssue(ctx, taskMsg, result, issueNumber); err != nil {
 		return fmt.Errorf("PR creation failed: %w", err)
 	}
 
@@ -492,6 +559,91 @@ func (w *ConcurrentTaskWorker) ResetAllFailureCounts() {
 		w.failureCount[provider] = 0
 	}
 	log.Println("Reset all provider failure counts (thread-safe)")
+}
+
+// createGitHubIssue creates a GitHub issue for the task
+func (w *ConcurrentTaskWorker) createGitHubIssue(ctx context.Context, taskMsg *TaskMessage) (string, string, error) {
+	if w.githubToken == "" || w.githubService == nil {
+		log.Printf("GitHub integration not configured, skipping issue creation")
+		return "", "", nil
+	}
+
+	// Parse repository name to extract owner and repo
+	parts := strings.Split(taskMsg.RepositoryName, "/")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid repository name format: %s", taskMsg.RepositoryName)
+	}
+	owner, repo := parts[0], parts[1]
+
+	// Generate request ID for tracking
+	requestID := mysql.PKIDGenerate()
+
+	// Create issue request
+	issueBody := w.githubService.GenerateIssueTemplate(taskMsg.Tasks, taskMsg.RepositoryName, taskMsg.WorkingDir, requestID)
+	issueReq := &response.CreateIssueRequest{
+		Title: fmt.Sprintf("Task: %s", taskMsg.Tasks),
+		Body:  &issueBody,
+		Labels: []string{"automated-task", "claude-ai"},
+	}
+
+	// Create the issue
+	issue, err := w.githubService.CreateIssue(ctx, w.githubToken, owner, repo, issueReq)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create GitHub issue: %w", err)
+	}
+
+	log.Printf("Created GitHub issue #%d for task: %s", issue.Number, taskMsg.Tasks)
+	return issue.HTMLURL, fmt.Sprintf("%d", issue.Number), nil
+}
+
+// recordTaskSuccess records successful task completion to database
+func (w *ConcurrentTaskWorker) recordTaskSuccess(taskMsg *TaskMessage, result *AITaskResponse, issueURL string) {
+	if w.db == nil {
+		log.Printf("Database connection not available, skipping success record")
+		return
+	}
+
+	requestID := mysql.PKIDGenerate()
+	now := time.Now()
+	processingTime := int64(0)
+
+	// Serialize result as JSON
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		log.Printf("Failed to marshal task result: %v", err)
+		resultJSON = []byte(`{"error": "failed to serialize result"}`)
+	}
+	resultStr := string(resultJSON)
+
+	history := mysql.WorkflowHistories{
+		RequestID:        requestID,
+		Status:          "completed",
+		Tasks:           taskMsg.Tasks,
+		RepositoryName:  taskMsg.RepositoryName,
+		Provider:        taskMsg.Provider,
+		Interactive:     taskMsg.Interactive,
+		ContinueTask:    taskMsg.ContinueTask,
+		CreatedAt:       now,
+		CompletedAt:     &now,
+		ProcessingTimeMs: &processingTime,
+		Result:          &resultStr,
+	}
+
+	if taskMsg.WorkingDir != "" {
+		history.WorkingDir = &taskMsg.WorkingDir
+	}
+	if taskMsg.Cmd != "" {
+		history.Cmd = &taskMsg.Cmd
+	}
+	if issueURL != "" {
+		history.GitHubIssueURL = &issueURL
+	}
+
+	if err := w.db.Create(&history).Error; err != nil {
+		log.Printf("Failed to record task success to database: %v", err)
+	} else {
+		log.Printf("Recorded task success to database with request_id: %s", requestID)
+	}
 }
 
 // recordTaskFailure records task failure to database (thread-safe)

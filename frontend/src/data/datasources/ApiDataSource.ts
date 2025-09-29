@@ -15,7 +15,14 @@ export interface ApiDataSource {
   
   // Tasks
   getTasks(repositoryName: string): Promise<Task[]>;
-  createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task>;
+  createTask(taskData: {
+    tasks: string;
+    repository_name: string;
+    working_dir?: string;
+    interactive?: boolean;
+    cmd?: string;
+    provider: 'claude' | 'codex' | 'cursor';
+  }): Promise<Task>;
   updateTask(id: string, updates: Partial<Task>): Promise<Task>;
   deleteTask(id: string): Promise<void>;
   executeTask(id: string): Promise<void>;

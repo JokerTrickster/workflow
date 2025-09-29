@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
+import { syncGitHubRepositories } from '@/lib/supabase/auth'
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -19,7 +20,13 @@ export default function AuthCallbackPage() {
         }
 
         if (data.session) {
-          // Successful authentication - redirect to dashboard or intended page
+          // Successful authentication - sync GitHub repositories in background
+          syncGitHubRepositories().catch(error => {
+            console.error('Background repository sync failed:', error)
+            // Don't block the user flow if sync fails
+          })
+
+          // Redirect to dashboard or intended page
           const redirectTo = new URLSearchParams(window.location.search).get('redirect') || '/dashboard'
           router.push(redirectTo)
         } else {

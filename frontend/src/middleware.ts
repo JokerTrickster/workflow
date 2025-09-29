@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 
 // Get API base URL for CSP
 function getApiHost(): string {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000/api/v1';
   return apiBaseUrl.replace('/api/v1', '');
 }
 
@@ -25,7 +25,7 @@ export function middleware(request: NextRequest) {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' blob: data: https: http:",
     "font-src 'self' https://fonts.gstatic.com",
-    `connect-src 'self' ${getApiHost()} http://localhost:8080 http://localhost:8081 https://api.github.com https://*.supabase.co wss://*.supabase.co`,
+    `connect-src 'self' ${getApiHost()} http://localhost:7000 http://localhost:7001 https://api.github.com https://*.supabase.co wss://*.supabase.co`,
     "frame-src 'self' https://github.com",
     "worker-src 'self' blob:",
     "child-src 'self'",

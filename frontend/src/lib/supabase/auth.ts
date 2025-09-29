@@ -125,3 +125,37 @@ export async function updateUserProfile(userId: string, updates: Record<string, 
     return { data: null, error }
   }
 }
+
+// Sync GitHub repositories after login
+export async function syncGitHubRepositories() {
+  try {
+    const { session } = await getSession()
+    if (!session?.provider_token) {
+      console.warn('No GitHub provider token found')
+      return { error: 'No GitHub token available' }
+    }
+
+    // Get API base URL from config
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000/api/v1'
+
+    const response = await fetch(`${apiBaseUrl}/github/sync-repositories`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.provider_token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      throw new Error(errorData.error || `HTTP ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('GitHub repositories synced successfully:', result)
+    return { data: result }
+  } catch (error) {
+    console.error('GitHub repository sync error:', error)
+    return { error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
