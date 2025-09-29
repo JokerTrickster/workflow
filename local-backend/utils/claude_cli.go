@@ -325,8 +325,7 @@ func (c *ClaudeProvider) prepareRepositoryWorkspace(ctx context.Context, request
 
 	// Ensure repository is up to date
 	if err := c.updateRepository(ctx, repositoryDir); err != nil {
-		log.Printf("Warning: failed to update repository: %v", err)
-		// Continue with current state if update fails
+		return "", fmt.Errorf("failed to update repository: %w", err)
 	}
 
 	// Create and checkout a working branch

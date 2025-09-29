@@ -3,7 +3,6 @@ package utils
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 )
 
 // GetRepositoryBasePath returns the base path for repositories based on the current user
@@ -13,23 +12,10 @@ func GetRepositoryBasePath() string {
 		return basePath
 	}
 
-	// Fallback to dynamic path based on current user's home directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		// If can't get home directory, fallback to current working directory
-		if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
-			// For macOS/Linux, try common paths
-			if _, err := os.Stat("/Users"); err == nil {
-				// Try to detect current user from common pattern
-				if currentUser := os.Getenv("USER"); currentUser != "" {
-					return filepath.Join("/Users", currentUser, "project", "git-repository")
-				}
-			}
-		}
-		return "/tmp/repositories" // Last resort fallback
-	}
-
-	return filepath.Join(homeDir, "project", "git-repository")
+	// Use relative path from current project directory
+	// Current path: /Users/luxrobo/project/workflow/local-backend
+	// Target path: /Users/luxrobo/project/git-repository
+	return "../../git-repository"
 }
 
 // GetRepositoryPath returns the full path for a specific repository
