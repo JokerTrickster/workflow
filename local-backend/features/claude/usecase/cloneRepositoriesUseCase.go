@@ -61,7 +61,7 @@ func (d *CloneRepositoriesUseCase) CloneRepositories(c context.Context, req *req
 	// 타겟 디렉토리 설정 (환경변수 우선, 요청 파라미터 다음, 기본값 마지막)
 	targetDir := os.Getenv("GITHUB_DEFAULT_TARGET_DIR")
 	if targetDir == "" {
-		targetDir = "/Users/mac/project/git-repository/JokerTrickster"
+		targetDir = utils.GetJokerTricksterPath()
 	}
 	if req.TargetDirectory != "" {
 		targetDir = req.TargetDirectory

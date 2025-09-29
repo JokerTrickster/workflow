@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/v0.1/claude/repositories/clone": {
             "post": {
-                "description": "GitHub 사용자/조직의 모든 저장소를 로컬 디렉토리에 복제합니다.\n\n**기능:**\n- GitHub API를 통해 지정된 사용자/조직의 모든 저장소 목록을 가져옵니다\n- 각 저장소를 지정된 로컬 디렉토리에 Git clone으로 복제합니다\n- 이미 존재하는 저장소는 건너뛰어 중복 다운로드를 방지합니다\n- 기본 사용자: JokerTrickster, 기본 경로: /Users/mac/project/git-repository/JokerTrickster\n\n**요청 예시:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"github_username\": \"JokerTrickster\",\n\"github_token\": \"ghp_xxxxxxxxxxxx\"\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n**응답 예시:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"status\": \"success\",\n\"total_repositories\": 15,\n\"cloned_count\": 12,\n\"skipped_count\": 3,\n\"failed_count\": 0,\n\"details\": [\n{\n\"name\": \"workflow\",\n\"clone_url\": \"https://github.com/JokerTrickster/workflow.git\",\n\"status\": \"cloned\",\n\"local_path\": \"/Users/mac/project/git-repository/JokerTrickster/workflow\"\n}\n]\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n■ **에러 코드 (HTTP 400)**\n- PARAM_BAD : 파라미터 오류 또는 유효성 검증 실패\n- GITHUB_USER_NOT_FOUND : GitHub 사용자/조직이 존재하지 않음\n- GITHUB_USERNAME_INVALID : GitHub 사용자명 형식이 올바르지 않음\n- GITHUB_API_RATE_LIMIT : GitHub API 호출 한도 초과\n- GITHUB_API_AUTH_FAILED : GitHub API 인증 실패\n\n■ **에러 코드 (HTTP 500)**\n- INTERNAL_SERVER : 내부 로직 처리 실패\n- DIRECTORY_CREATE_FAILED : 대상 디렉토리 생성 실패\n- GIT_CLONE_FAILED : Git 복제 작업 실패\n- GITHUB_API_ERROR : GitHub API 서버 오류",
+                "description": "GitHub 사용자/조직의 모든 저장소를 로컬 디렉토리에 복제합니다.\n\n**기능:**\n- GitHub API를 통해 지정된 사용자/조직의 모든 저장소 목록을 가져옵니다\n- 각 저장소를 지정된 로컬 디렉토리에 Git clone으로 복제합니다\n- 이미 존재하는 저장소는 건너뛰어 중복 다운로드를 방지합니다\n- 기본 사용자: JokerTrickster, 기본 경로: ~/project/git-repository/JokerTrickster\n\n**요청 예시:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"github_username\": \"JokerTrickster\",\n\"github_token\": \"ghp_xxxxxxxxxxxx\"\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n**응답 예시:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"status\": \"success\",\n\"total_repositories\": 15,\n\"cloned_count\": 12,\n\"skipped_count\": 3,\n\"failed_count\": 0,\n\"details\": [\n{\n\"name\": \"workflow\",\n\"clone_url\": \"https://github.com/JokerTrickster/workflow.git\",\n\"status\": \"cloned\",\n\"local_path\": \"~/project/git-repository/JokerTrickster/workflow\"\n}\n]\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n■ **에러 코드 (HTTP 400)**\n- PARAM_BAD : 파라미터 오류 또는 유효성 검증 실패\n- GITHUB_USER_NOT_FOUND : GitHub 사용자/조직이 존재하지 않음\n- GITHUB_USERNAME_INVALID : GitHub 사용자명 형식이 올바르지 않음\n- GITHUB_API_RATE_LIMIT : GitHub API 호출 한도 초과\n- GITHUB_API_AUTH_FAILED : GitHub API 인증 실패\n\n■ **에러 코드 (HTTP 500)**\n- INTERNAL_SERVER : 내부 로직 처리 실패\n- DIRECTORY_CREATE_FAILED : 대상 디렉토리 생성 실패\n- GIT_CLONE_FAILED : Git 복제 작업 실패\n- GITHUB_API_ERROR : GitHub API 서버 오류",
                 "produces": [
                     "application/json"
                 ],
@@ -56,7 +56,7 @@ const docTemplate = `{
         },
         "/v0.1/claude/tasks/run": {
             "post": {
-                "description": "지정된 저장소에서 Claude CLI 명령어를 실행합니다\n\n**기능:**\n- repository_name으로 지정된 저장소(/Users/mac/project/git-repository/{repository_name})에서 작업 실행\n- interactive 모드: 여러 작업을 순차적으로 실행 (줄바꿈 또는 세미콜론으로 구분)\n- 일반 모드: 단일 작업을 한 번에 실행\n- --dangerously-skip-permissions 플래그로 승인 요청 없이 자동 실행\n\n**필수 파라미터:**\n- tasks: 실행할 작업 내용\n- repository_name: 작업할 저장소 이름 (필수)\n\n**Interactive 모드 예시:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"tasks\": \"echo 첫번째 작업\\necho 두번째 작업\\necho 세번째 작업\",\n\"repository_name\": \"JokerTrickster\",\n\"interactive\": true\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n■ **에러 코드 (HTTP 400)**\n- PARAM_BAD : 파라미터 오류 또는 유효성 검증 실패\n- REPOSITORY_NAME_REQUIRED : repository_name 필수 파라미터 누락\n\n■ **에러 코드 (HTTP 500)**\n- INTERNAL_SERVER : 내부 로직 처리 실패\n- REPOSITORY_NOT_FOUND : 저장소 디렉토리를 찾을 수 없음\n- CLAUDE_CLI_EXECUTION_FAILED : Claude CLI 실행 실패",
+                "description": "지정된 저장소에서 Claude CLI 명령어를 실행합니다\n\n**기능:**\n- repository_name으로 지정된 저장소(~/project/git-repository/JokerTrickster/{repository_name})에서 작업 실행\n- interactive 모드: 여러 작업을 순차적으로 실행 (줄바꿈 또는 세미콜론으로 구분)\n- 일반 모드: 단일 작업을 한 번에 실행\n- --dangerously-skip-permissions 플래그로 승인 요청 없이 자동 실행\n\n**필수 파라미터:**\n- tasks: 실행할 작업 내용\n- repository_name: 작업할 저장소 이름 (필수)\n\n**Interactive 모드 예시:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"tasks\": \"echo 첫번째 작업\\necho 두번째 작업\\necho 세번째 작업\",\n\"repository_name\": \"JokerTrickster\",\n\"interactive\": true\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n■ **에러 코드 (HTTP 400)**\n- PARAM_BAD : 파라미터 오류 또는 유효성 검증 실패\n- REPOSITORY_NAME_REQUIRED : repository_name 필수 파라미터 누락\n\n■ **에러 코드 (HTTP 500)**\n- INTERNAL_SERVER : 내부 로직 처리 실패\n- REPOSITORY_NOT_FOUND : 저장소 디렉토리를 찾을 수 없음\n- CLAUDE_CLI_EXECUTION_FAILED : Claude CLI 실행 실패",
                 "produces": [
                     "application/json"
                 ],
@@ -140,11 +140,12 @@ const docTemplate = `{
         "request.ReqRunTasksClaude": {
             "type": "object",
             "required": [
+                "provider",
                 "repository_name",
                 "tasks"
             ],
             "properties": {
-                "claude_cmd": {
+                "cmd": {
                     "description": "Claude CLI 명령어 경로 (옵션)",
                     "type": "string"
                 },
@@ -155,6 +156,10 @@ const docTemplate = `{
                 "interactive": {
                     "description": "대화형 모드: 여러 작업을 순차 실행",
                     "type": "boolean"
+                },
+                "provider": {
+                    "description": "AI 모델 제공자 (예: \"claude\") (필수)",
+                    "type": "string"
                 },
                 "repository_name": {
                     "description": "레포지토리 이름 (필수)",
@@ -208,7 +213,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:8080",
+	Host:             "localhost:7001",
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "Local Backend API",

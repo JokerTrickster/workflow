@@ -313,9 +313,8 @@ func (c *ClaudeProvider) prepareRepositoryWorkspace(ctx context.Context, request
 		return workingDir, c.ensureWorkingDirectory(workingDir)
 	}
 
-	// Use existing local repository
-	baseDir := "/Users/mac/project/git-repository/JokerTrickster"
-	repositoryDir := filepath.Join(baseDir, request.RepositoryName)
+	// Use existing local repository with dynamic path detection
+	repositoryDir := GetRepositoryPath(request.RepositoryName)
 
 	log.Printf("Using existing repository for %s at %s", request.RepositoryName, repositoryDir)
 

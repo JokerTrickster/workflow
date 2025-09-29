@@ -24,7 +24,7 @@ import (
 // @title Local Backend API
 // @version 1.0
 // @description This is a local backend server API
-// @host localhost:8081
+// @host localhost:7001
 // @BasePath /
 func main() {
 	// Create context for graceful shutdown
@@ -98,7 +98,7 @@ func main() {
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
-		port = "8081"
+		port = "7001"
 	}
 
 	// Start HTTP server in goroutine

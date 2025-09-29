@@ -28,7 +28,7 @@ func NewRunTasksClaudeHandler(c *echo.Echo, useCase _interface.IRunTasksClaudeUs
 // @Description 지정된 저장소에서 Claude CLI 명령어를 실행합니다
 // @Description
 // @Description **기능:**
-// @Description - repository_name으로 지정된 저장소(/Users/mac/project/git-repository/{repository_name})에서 작업 실행
+// @Description - repository_name으로 지정된 저장소(~/project/git-repository/JokerTrickster/{repository_name})에서 작업 실행
 // @Description - interactive 모드: 여러 작업을 순차적으로 실행 (줄바꿈 또는 세미콜론으로 구분)
 // @Description - 일반 모드: 단일 작업을 한 번에 실행
 // @Description - --dangerously-skip-permissions 플래그로 승인 요청 없이 자동 실행

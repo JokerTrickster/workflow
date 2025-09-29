@@ -45,8 +45,8 @@ func (d *RunTasksClaudeUseCase) RunTasks(c context.Context, req *request.ReqRunT
 	var repo *utils.RepositoryInfo
 	var taskFilePath string
 
-	// 고정된 경로로 레포지토리 경로 설정 (JokerTrickster 하위)
-	repoPath := fmt.Sprintf("/Users/mac/project/git-repository/JokerTrickster/%s", req.RepositoryName)
+	// 동적 경로로 레포지토리 경로 설정 (JokerTrickster 하위)
+	repoPath := utils.GetRepositoryPath(req.RepositoryName)
 
 	// 레포지토리 디렉토리 존재 확인
 	if _, err := os.Stat(repoPath); os.IsNotExist(err) {

@@ -31,7 +31,7 @@ func NewCloneRepositoriesHandler(c *echo.Echo, useCase _interface.ICloneReposito
 // @Description - GitHub API를 통해 지정된 사용자/조직의 모든 저장소 목록을 가져옵니다
 // @Description - 각 저장소를 지정된 로컬 디렉토리에 Git clone으로 복제합니다
 // @Description - 이미 존재하는 저장소는 건너뛰어 중복 다운로드를 방지합니다
-// @Description - 기본 사용자: JokerTrickster, 기본 경로: /Users/mac/project/git-repository/JokerTrickster
+// @Description - 기본 사용자: JokerTrickster, 기본 경로: ~/project/git-repository/JokerTrickster
 // @Description
 // @Description **요청 예시:**
 // @Description ```json
@@ -54,7 +54,7 @@ func NewCloneRepositoriesHandler(c *echo.Echo, useCase _interface.ICloneReposito
 // @Description       "name": "workflow",
 // @Description       "clone_url": "https://github.com/JokerTrickster/workflow.git",
 // @Description       "status": "cloned",
-// @Description       "local_path": "/Users/mac/project/git-repository/JokerTrickster/workflow"
+// @Description       "local_path": "~/project/git-repository/JokerTrickster/workflow"
 // @Description     }
 // @Description   ]
 // @Description }
