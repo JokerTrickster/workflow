@@ -69,7 +69,6 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [taskToExecute, setTaskToExecute] = useState<Task | undefined>();
   
-  const activityLogger = ActivityLogger.getInstance();
   const taskFileManager = TaskFileManager.getInstance();
 
   // Load tasks from epic files on component mount and repository change
@@ -286,14 +285,6 @@ Task created on ${new Date().toISOString()}`;
         metadata.branchName = taskData.branch_name;
       }
       
-      activityLogger.logTaskCreated(
-        taskFile.metadata.id,
-        taskFile.metadata.title,
-        repository.id,
-        repository.name,
-        metadata
-      );
-      
       setShowCreateDialog(false);
       setSelectedGitHubIssue(undefined);
       setSelectedGitHubPR(undefined);
@@ -303,13 +294,6 @@ Task created on ${new Date().toISOString()}`;
       refetch();
     } catch (error) {
       console.error('Failed to create task:', error);
-      
-      // Log task creation failure
-      activityLogger.logTaskFailed(
-        'unknown',
-        taskData.title,
-        error instanceof Error ? error.message : 'Unknown error during task creation'
-      );
       
       // TODO: Add proper error handling/notification
     } finally {
@@ -351,9 +335,6 @@ Task created on ${new Date().toISOString()}`;
 
       const result = await response.json();
       console.log('Task execution result:', result);
-
-      // Log task execution started
-      activityLogger.logTaskStarted(taskToExecute.id, taskToExecute.title);
 
       // Auto-refresh tasks list
       refetch();
@@ -1348,10 +1329,7 @@ Task created on ${new Date().toISOString()}`;
                         undefined,
                         repository.name
                       );
-                      
-                      // Log activity
-                      activityLogger.logTaskStarted(selectedTask.id, selectedTask.title);
-                      
+
                       // Refresh tasks list
                       await loadTasks();
                       
@@ -1383,10 +1361,6 @@ Task created on ${new Date().toISOString()}`;
                           undefined,
                           repository.name
                         );
-                        
-                        // Log activity
-                        activityLogger.logTaskCancelled(selectedTask.id, selectedTask.title);
-                        
                         // Refresh tasks list
                         await loadTasks();
                         
@@ -1403,9 +1377,6 @@ Task created on ${new Date().toISOString()}`;
                   <Button 
                     onClick={async () => {
                       try {
-                        // Log resume activity
-                        activityLogger.logTaskResumed(selectedTask.id, selectedTask.title);
-                        
                         // Close modal and let user continue working
                         handleCloseTaskDetail();
                       } catch (error) {
