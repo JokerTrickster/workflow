@@ -17,6 +17,7 @@ type WorkflowHistories struct {
 	Tasks          string  `json:"tasks" gorm:"column:tasks;type:text;not null"`
 	RepositoryName string  `json:"repository_name" gorm:"column:repository_name;type:varchar(255);index;not null"`
 	WorkingDir     *string `json:"working_dir,omitempty" gorm:"column:working_dir"`
+	BranchName     *string `json:"branch_name,omitempty" gorm:"column:branch_name"`
 	Cmd            *string `json:"cmd,omitempty" gorm:"column:cmd"`
 	Interactive    bool    `json:"interactive" gorm:"column:interactive;default:false"`
 	ContinueTask   bool    `json:"continue_task" gorm:"column:continue_task;default:false"`
@@ -35,7 +36,6 @@ type WorkflowHistories struct {
 	// Git workflow 정보
 	GitHubIssueURL *string `json:"github_issue_url,omitempty" gorm:"column:github_issue_url"`
 	GitHubPRURL    *string `json:"github_pr_url,omitempty" gorm:"column:github_pr_url"`
-	BranchName     *string `json:"branch_name,omitempty" gorm:"column:branch_name"`
 	CleanupStatus  *string `json:"cleanup_status,omitempty" gorm:"column:cleanup_status;default:pending"`
 }
 

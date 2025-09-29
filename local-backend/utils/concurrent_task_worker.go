@@ -405,8 +405,8 @@ func (w *ConcurrentTaskWorker) shouldCreatePR(result *AITaskResponse) bool {
 func (w *ConcurrentTaskWorker) commitAndPushChanges(ctx context.Context, taskMsg *TaskMessage, result *AITaskResponse) error {
 	log.Printf("Committing and pushing changes for task: %s", taskMsg.Tasks)
 
-	// Calculate actual repository path instead of using taskMsg.WorkingDir (which might be branch name)
-	workingDir := fmt.Sprintf("../../git-repository/JokerTrickster/%s", taskMsg.RepositoryName)
+	// Use the working directory from taskMsg (already contains proper path like "JokerTrickster/gallery_ios")
+	workingDir := fmt.Sprintf("../../git-repository/%s", taskMsg.WorkingDir)
 	log.Printf("Using actual working directory for Git operations: %s", workingDir)
 
 	// Validate that this is a Git repository (Claude provider should have set this up)
@@ -522,8 +522,8 @@ func (w *ConcurrentTaskWorker) cloneOrInitRepository(ctx context.Context, reposi
 func (w *ConcurrentTaskWorker) createPullRequest(ctx context.Context, taskMsg *TaskMessage, result *AITaskResponse, issueNumber string) error {
 	log.Printf("Creating PR for completed task: %s", taskMsg.Tasks)
 
-	// Calculate actual repository path instead of using taskMsg.WorkingDir (which might be branch name)
-	actualWorkingDir := fmt.Sprintf("../../git-repository/JokerTrickster/%s", taskMsg.RepositoryName)
+	// Use the working directory from taskMsg (already contains proper path)
+	actualWorkingDir := fmt.Sprintf("../../git-repository/%s", taskMsg.WorkingDir)
 	log.Printf("Starting PR creation process for task: %s", taskMsg.Tasks)
 	log.Printf("Using actual working directory: %s", actualWorkingDir)
 
@@ -599,7 +599,7 @@ func (w *ConcurrentTaskWorker) createGitHubIssue(ctx context.Context, taskMsg *T
 	requestID := mysql.PKIDGenerate()
 
 	// Create issue request
-	issueBody := w.githubService.GenerateIssueTemplate(taskMsg.Tasks, taskMsg.RepositoryName, taskMsg.WorkingDir, requestID)
+	issueBody := w.githubService.GenerateIssueTemplate(taskMsg.Tasks, taskMsg.RepositoryName, taskMsg.BranchName, requestID)
 	issueReq := &response.CreateIssueRequest{
 		Title: fmt.Sprintf("Task: %s", taskMsg.Tasks),
 		Body:  &issueBody,
@@ -652,6 +652,9 @@ func (w *ConcurrentTaskWorker) recordTaskSuccess(taskMsg *TaskMessage, result *A
 	if taskMsg.WorkingDir != "" {
 		history.WorkingDir = &taskMsg.WorkingDir
 	}
+	if taskMsg.BranchName != "" {
+		history.BranchName = &taskMsg.BranchName
+	}
 	if taskMsg.Cmd != "" {
 		history.Cmd = &taskMsg.Cmd
 	}
@@ -692,6 +695,9 @@ func (w *ConcurrentTaskWorker) recordTaskFailure(taskMsg *TaskMessage, errorMsg 
 
 	if taskMsg.WorkingDir != "" {
 		history.WorkingDir = &taskMsg.WorkingDir
+	}
+	if taskMsg.BranchName != "" {
+		history.BranchName = &taskMsg.BranchName
 	}
 	if taskMsg.Cmd != "" {
 		history.Cmd = &taskMsg.Cmd

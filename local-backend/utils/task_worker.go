@@ -32,6 +32,7 @@ type TaskMessage struct {
 	Tasks          string `json:"tasks"`
 	RepositoryName string `json:"repository_name"`
 	WorkingDir     string `json:"working_dir,omitempty"`
+	BranchName     string `json:"branch_name,omitempty"`
 	Interactive    bool   `json:"interactive,omitempty"`
 	Cmd            string `json:"cmd,omitempty"`
 	ContinueTask   bool   `json:"continue_task,omitempty"`
@@ -349,6 +350,9 @@ func (w *TaskWorker) recordTaskFailure(taskMsg *TaskMessage, errorMsg string) {
 	// Set optional fields if present
 	if taskMsg.WorkingDir != "" {
 		history.WorkingDir = &taskMsg.WorkingDir
+	}
+	if taskMsg.BranchName != "" {
+		history.BranchName = &taskMsg.BranchName
 	}
 	if taskMsg.Cmd != "" {
 		history.Cmd = &taskMsg.Cmd
