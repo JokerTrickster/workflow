@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"main/utils/db/mysql"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -174,7 +177,15 @@ func (w *ConcurrentTaskWorker) handleMessageConcurrent(ctx context.Context, msg 
 		return
 	}
 
-	// Handle successful completion - check if PR needed
+	// Handle successful completion - commit and push changes first
+	if w.shouldCommitChanges(result) {
+		if err := w.commitAndPushChanges(ctx, &taskMsg, result); err != nil {
+			log.Printf("Failed to commit and push changes: %v", err)
+			// Continue with PR creation even if commit/push fails
+		}
+	}
+
+	// Check if PR needed after committing changes
 	if w.shouldCreatePR(result) {
 		if err := w.createPullRequest(ctx, &taskMsg, result); err != nil {
 			log.Printf("Failed to create PR for completed task: %v", err)
@@ -280,17 +291,149 @@ func (w *ConcurrentTaskWorker) executeTaskConcurrent(ctx context.Context, taskMs
 	return response, nil
 }
 
+// shouldCommitChanges determines if a completed task should commit changes
+func (w *ConcurrentTaskWorker) shouldCommitChanges(result *AITaskResponse) bool {
+	if result == nil || !result.Success {
+		return false
+	}
+
+	// Check if task involved file changes
+	return len(result.FilesModified) > 0 ||
+		   strings.Contains(result.Output, "git add") ||
+		   strings.Contains(result.Output, "modified:") ||
+		   strings.Contains(result.Output, "new file:") ||
+		   strings.Contains(result.Output, "Edit") ||
+		   strings.Contains(result.Output, "Write") ||
+		   strings.Contains(result.Output, "MultiEdit")
+}
+
 // shouldCreatePR determines if a completed task should create a PR
 func (w *ConcurrentTaskWorker) shouldCreatePR(result *AITaskResponse) bool {
 	if result == nil || !result.Success {
 		return false
 	}
 
-	// Check if task involved file changes
-	return result.FilesModified > 0 ||
-		   strings.Contains(result.Output, "git add") ||
-		   strings.Contains(result.Output, "modified:") ||
-		   strings.Contains(result.Output, "new file:")
+	// Always create PR for successful tasks to ensure visibility
+	// The PR creation process will validate if there are actual changes
+	return true
+}
+
+// commitAndPushChanges commits and pushes changes to Git repository
+func (w *ConcurrentTaskWorker) commitAndPushChanges(ctx context.Context, taskMsg *TaskMessage, result *AITaskResponse) error {
+	log.Printf("Committing and pushing changes for task: %s", taskMsg.Tasks)
+
+	workingDir := taskMsg.WorkingDir
+	if workingDir == "" {
+		return fmt.Errorf("working directory is required for Git operations")
+	}
+
+	// Validate that this is a Git repository (Claude provider should have set this up)
+	gitDir := filepath.Join(workingDir, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		log.Printf("Working directory is not a Git repository: %s", workingDir)
+		log.Printf("This indicates the Claude provider didn't set up the repository correctly")
+		return nil // Don't fail the task, just skip Git operations
+	}
+
+	// Add all changes
+	if err := w.runGitCommand(ctx, workingDir, "add", "."); err != nil {
+		return fmt.Errorf("failed to add changes: %w", err)
+	}
+
+	// Check if there are changes to commit
+	statusOutput, err := w.runGitCommandWithOutput(ctx, workingDir, "status", "--porcelain")
+	if err != nil {
+		return fmt.Errorf("failed to check git status: %w", err)
+	}
+
+	if strings.TrimSpace(statusOutput) == "" {
+		log.Printf("No changes to commit for task: %s", taskMsg.Tasks)
+		return nil
+	}
+
+	// Create commit message
+	commitMsg := fmt.Sprintf("feat: %s\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>", taskMsg.Tasks)
+
+	// Commit changes
+	if err := w.runGitCommand(ctx, workingDir, "commit", "-m", commitMsg); err != nil {
+		return fmt.Errorf("failed to commit changes: %w", err)
+	}
+
+	// Get current branch name
+	branchOutput, err := w.runGitCommandWithOutput(ctx, workingDir, "branch", "--show-current")
+	if err != nil {
+		return fmt.Errorf("failed to get current branch: %w", err)
+	}
+	currentBranch := strings.TrimSpace(branchOutput)
+
+	// Push changes to the current branch and set upstream
+	if err := w.runGitCommand(ctx, workingDir, "push", "--set-upstream", "origin", currentBranch); err != nil {
+		return fmt.Errorf("failed to push changes to branch %s: %w", currentBranch, err)
+	}
+
+	log.Printf("Successfully committed and pushed changes for task: %s", taskMsg.Tasks)
+	return nil
+}
+
+// runGitCommand executes a Git command in the specified directory
+func (w *ConcurrentTaskWorker) runGitCommand(ctx context.Context, workingDir string, args ...string) error {
+	_, err := w.runGitCommandWithOutput(ctx, workingDir, args...)
+	return err
+}
+
+// runGitCommandWithOutput executes a Git command and returns output
+func (w *ConcurrentTaskWorker) runGitCommandWithOutput(ctx context.Context, workingDir string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = workingDir
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Git command failed: git %s\nOutput: %s\nError: %v",
+			strings.Join(args, " "), string(output), err)
+		return string(output), err
+	}
+
+	log.Printf("Git command succeeded: git %s", strings.Join(args, " "))
+	return string(output), nil
+}
+
+// cloneOrInitRepository clones a repository and creates a working branch
+func (w *ConcurrentTaskWorker) cloneOrInitRepository(ctx context.Context, repositoryName, workingDir string) error {
+	log.Printf("Setting up Git repository for %s in %s", repositoryName, workingDir)
+
+	// Try to clone from GitHub first
+	githubURL := fmt.Sprintf("https://github.com/%s.git", repositoryName)
+
+	// Remove the existing directory and clone fresh
+	if err := os.RemoveAll(workingDir); err != nil {
+		log.Printf("Failed to remove existing directory: %v", err)
+	}
+
+	parentDir := filepath.Dir(workingDir)
+	cloneName := filepath.Base(workingDir)
+
+	// Try to clone the repository
+	cmd := exec.CommandContext(ctx, "git", "clone", githubURL, cloneName)
+	cmd.Dir = parentDir
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Failed to clone repository %s: %v\nOutput: %s", githubURL, err, string(output))
+		return fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	log.Printf("Successfully cloned repository %s to %s", githubURL, workingDir)
+
+	// Create a new branch for this task
+	branchName := fmt.Sprintf("task-%d", time.Now().Unix())
+	if err := w.runGitCommand(ctx, workingDir, "checkout", "-b", branchName); err != nil {
+		log.Printf("Warning: failed to create branch %s: %v", branchName, err)
+		// Continue with main branch if branch creation fails
+	} else {
+		log.Printf("Created and switched to branch: %s", branchName)
+	}
+
+	return nil
 }
 
 // createPullRequest creates a GitHub PR for completed tasks

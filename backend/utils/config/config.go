@@ -21,8 +21,12 @@ type DatabaseConfig struct {
 }
 
 type RabbitMQConfig struct {
-	URL       string
-	QueueName string
+	QueueName string `json:"queue_name"`
+	Exchange  string `json:"exchange"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	Host      string `json:"host"`
+	Port      string `json:"port"`
 }
 
 type ServerConfig struct {
@@ -34,11 +38,11 @@ var GlobalConfig *Config
 
 func InitConfig() error {
 	// Build MySQL DSN from individual components
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "3306")
-	dbName := getEnv("DB_NAME", "dev_workflow")
-	dbUser := getEnv("DB_USERNAME", "root")
-	dbPassword := getEnv("DB_PASSWORD", "")
+	dbHost := getEnv("MYSQL_HOST", "localhost")
+	dbPort := getEnv("MYSQL_PORT", "3306")
+	dbName := getEnv("MYSQL_DATABASE", "dev_workflow")
+	dbUser := getEnv("MYSQL_USER", "root")
+	dbPassword := getEnv("MYSQL_PASSWORD", "")
 
 	// MySQL DSN format: user:password@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
 	mysqlDSN := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
@@ -54,8 +58,12 @@ func InitConfig() error {
 			Password: dbPassword,
 		},
 		RabbitMQ: RabbitMQConfig{
-			URL:       getEnv("RABBITMQ_URL", "amqp://localhost:5672"),
-			QueueName: getEnv("RABBITMQ_QUEUE_NAME", "workflow_tasks"),
+			QueueName: getEnv("RABBITMQ_QUEUE_NAME", "workflow_queue"),
+			Exchange:  getEnv("RABBITMQ_EXCHANGE", ""),
+			Username:  getEnv("RABBITMQ_USER", "board"),
+			Password:  getEnv("RABBITMQ_PASSWORD", "examplepassword"),
+			Host:      getEnv("RABBITMQ_HOST", "13.203.37.93"),
+			Port:      getEnv("RABBITMQ_PORT", "5672"),
 		},
 		Server: ServerConfig{
 			Host: getEnv("SERVER_HOST", "localhost"),

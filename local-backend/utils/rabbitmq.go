@@ -23,10 +23,10 @@ type RabbitMQConfig struct {
 
 // RabbitMQConnection represents a RabbitMQ connection
 type RabbitMQConnection struct {
-	conn     *amqp.Connection
-	channel  *amqp.Channel
-	config   *RabbitMQConfig
-	done     chan bool
+	conn    *amqp.Connection
+	channel *amqp.Channel
+	config  *RabbitMQConfig
+	done    chan bool
 }
 
 // WorkflowMessage represents a message from the queue
@@ -180,14 +180,22 @@ func (r *RabbitMQConnection) Close() error {
 
 // LoadRabbitMQConfigFromEnv loads RabbitMQ configuration from environment variables
 func LoadRabbitMQConfigFromEnv() *RabbitMQConfig {
+	username := getEnvOrDefault("RABBITMQ_USER", "guest")
+	password := getEnvOrDefault("RABBITMQ_PASSWORD", "guest")
+	host := getEnvOrDefault("RABBITMQ_HOST", "localhost")
+	port := getEnvOrDefault("RABBITMQ_PORT", "5672")
+
+	// Build URL from environment variables
+	url := getEnvOrDefault("RABBITMQ_URL", fmt.Sprintf("amqp://%s:%s@%s:%s/", username, password, host, port))
+
 	return &RabbitMQConfig{
-		URL:       getEnvOrDefault("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
-		QueueName: getEnvOrDefault("RABBITMQ_QUEUE_NAME", "workflow_queue"),
+		URL:       url,
+		QueueName: getEnvOrDefault("RABBITMQ_QUEUE", "workflow_queue"),
 		Exchange:  getEnvOrDefault("RABBITMQ_EXCHANGE", ""),
-		Username:  getEnvOrDefault("RABBITMQ_USERNAME", "guest"),
-		Password:  getEnvOrDefault("RABBITMQ_PASSWORD", "guest"),
-		Host:      getEnvOrDefault("RABBITMQ_HOST", "localhost"),
-		Port:      getEnvOrDefault("RABBITMQ_PORT", "5672"),
+		Username:  username,
+		Password:  password,
+		Host:      host,
+		Port:      port,
 	}
 }
 

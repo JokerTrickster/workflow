@@ -37,7 +37,7 @@ func InitRabbitMQ() error {
 }
 
 func NewRabbitMQClient() (*RabbitMQClient, error) {
-	conn, err := amqp.Dial(config.GlobalConfig.RabbitMQ.URL)
+	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%s/", config.GlobalConfig.RabbitMQ.Username, config.GlobalConfig.RabbitMQ.Password, config.GlobalConfig.RabbitMQ.Host, config.GlobalConfig.RabbitMQ.Port))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
 	}
@@ -51,11 +51,11 @@ func NewRabbitMQClient() (*RabbitMQClient, error) {
 	// 큐 선언
 	_, err = ch.QueueDeclare(
 		config.GlobalConfig.RabbitMQ.QueueName, // queue name
-		true,  // durable
-		false, // delete when unused
-		false, // exclusive
-		false, // no-wait
-		nil,   // arguments
+		true,                                   // durable
+		false,                                  // delete when unused
+		false,                                  // exclusive
+		false,                                  // no-wait
+		nil,                                    // arguments
 	)
 	if err != nil {
 		ch.Close()
@@ -80,10 +80,10 @@ func (r *RabbitMQClient) PublishTaskMessage(msg *TaskMessage) error {
 	}
 
 	err = r.channel.Publish(
-		"",                                      // exchange
+		"",                                     // exchange
 		config.GlobalConfig.RabbitMQ.QueueName, // routing key
-		false,                                   // mandatory
-		false,                                   // immediate
+		false,                                  // mandatory
+		false,                                  // immediate
 		amqp.Publishing{
 			ContentType: "application/json",
 			Body:        body,

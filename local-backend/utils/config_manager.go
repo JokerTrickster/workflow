@@ -165,7 +165,7 @@ func (cm *ConfigManager) LoadRabbitMQConfigFromDB() (*RabbitMQConfig, error) {
 		URL:       getConfigValue(configMap, "rabbitmq.url", "amqp://guest:guest@localhost:5672/"),
 		QueueName: getConfigValue(configMap, "rabbitmq.queue_name", "workflow_queue"),
 		Exchange:  getConfigValue(configMap, "rabbitmq.exchange", ""),
-		Username:  getConfigValue(configMap, "rabbitmq.username", "guest"),
+		Username:  getConfigValue(configMap, "rabbitmq.user", "guest"),
 		Password:  getConfigValue(configMap, "rabbitmq.password", "guest"),
 		Host:      getConfigValue(configMap, "rabbitmq.host", "localhost"),
 		Port:      getConfigValue(configMap, "rabbitmq.port", "5672"),

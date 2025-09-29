@@ -18,4 +18,7 @@ type ITaskHandler interface {
 
 	// GetTaskStatus handles GET /api/v1/tasks/{id}/status
 	GetTaskStatus(c echo.Context) error
+
+	// GetTask handles GET /api/v1/tasks/{id}
+	GetTask(c echo.Context) error
 }

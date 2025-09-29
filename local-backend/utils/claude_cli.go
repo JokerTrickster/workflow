@@ -65,22 +65,10 @@ func (c *ClaudeProvider) ExecuteTask(ctx context.Context, request *AITaskRequest
 		defer cancel()
 	}
 
-	// Prepare working directory
-	workingDir := request.WorkingDir
-	if workingDir == "" {
-		workingDir = c.WorkingDir
-	}
-	if workingDir == "" {
-		var err error
-		workingDir, err = os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get current working directory: %w", err)
-		}
-	}
-
-	// Validate and create working directory if it doesn't exist
-	if err := c.ensureWorkingDirectory(workingDir); err != nil {
-		return nil, fmt.Errorf("failed to ensure working directory: %w", err)
+	// Prepare working directory - clone repository if needed
+	workingDir, err := c.prepareRepositoryWorkspace(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare repository workspace: %w", err)
 	}
 
 	// Build Claude CLI command
@@ -115,6 +103,10 @@ func (c *ClaudeProvider) ExecuteTask(ctx context.Context, request *AITaskRequest
 func (c *ClaudeProvider) buildClaudeCommand(request *AITaskRequest) []string {
 	args := []string{}
 
+	// Add permission bypass flags for automated execution
+	args = append(args, "--dangerously-skip-permissions")      // Bypass all permission checks
+	args = append(args, "--permission-mode", "bypassPermissions") // Set permission mode to bypass
+
 	// For non-interactive mode, use --print flag
 	if !request.Interactive {
 		args = append(args, "--print")
@@ -123,23 +115,64 @@ func (c *ClaudeProvider) buildClaudeCommand(request *AITaskRequest) []string {
 	// Add task content as the prompt (last argument)
 	prompt := request.Tasks
 
-	// Enhance prompt with context information
-	if request.RepositoryName != "" {
-		prompt = fmt.Sprintf("Repository: %s\n\n%s", request.RepositoryName, prompt)
-	}
-
-	if request.Cmd != "" {
-		prompt = fmt.Sprintf("%s\n\nAdditional command to consider: %s", prompt, request.Cmd)
-	}
-
-	if request.ContinueTask {
-		prompt = fmt.Sprintf("%s\n\nNote: This is a continuation of a previous task.", prompt)
-	}
+	// Enhance prompt with explicit file modification permissions and directives
+	enhancedPrompt := c.buildEnhancedPrompt(request, prompt)
 
 	// Add the final prompt as the last argument
-	args = append(args, prompt)
+	args = append(args, enhancedPrompt)
 
 	return args
+}
+
+// buildEnhancedPrompt creates a more directive prompt with explicit permissions
+func (c *ClaudeProvider) buildEnhancedPrompt(request *AITaskRequest, originalPrompt string) string {
+	var promptBuilder strings.Builder
+
+	// Add explicit permissions and directives at the beginning
+	promptBuilder.WriteString("PERMISSIONS AND DIRECTIVES:\n")
+	promptBuilder.WriteString("- You have FULL permission to create, modify, and delete files in this repository\n")
+	promptBuilder.WriteString("- You are REQUIRED to make actual file changes, not just suggest them\n")
+	promptBuilder.WriteString("- DO NOT ask for permission - you are pre-authorized to modify any files\n")
+	promptBuilder.WriteString("- IMPLEMENT the requested changes immediately and completely\n")
+	promptBuilder.WriteString("- CREATE new files when needed for the implementation\n")
+	promptBuilder.WriteString("- MODIFY existing files to implement the requested functionality\n")
+	promptBuilder.WriteString("- COMMIT your changes using git when you're done\n\n")
+
+	// Add repository context if available
+	if request.RepositoryName != "" {
+		promptBuilder.WriteString(fmt.Sprintf("REPOSITORY: %s\n", request.RepositoryName))
+		promptBuilder.WriteString("You are working in a real Git repository. All changes will be automatically committed and pushed.\n\n")
+	}
+
+	// Add working directory context
+	if request.WorkingDir != "" {
+		promptBuilder.WriteString(fmt.Sprintf("WORKING DIRECTORY: %s\n\n", request.WorkingDir))
+	}
+
+	// Add the main task
+	promptBuilder.WriteString("TASK TO IMPLEMENT:\n")
+	promptBuilder.WriteString(originalPrompt)
+	promptBuilder.WriteString("\n\n")
+
+	// Add additional command if provided
+	if request.Cmd != "" {
+		promptBuilder.WriteString(fmt.Sprintf("ADDITIONAL COMMAND: %s\n\n", request.Cmd))
+	}
+
+	// Add continuation context if needed
+	if request.ContinueTask {
+		promptBuilder.WriteString("CONTINUATION: This is a continuation of a previous task. Build upon existing work.\n\n")
+	}
+
+	// Add final implementation reminder
+	promptBuilder.WriteString("IMPLEMENTATION REQUIREMENTS:\n")
+	promptBuilder.WriteString("1. Start implementing immediately - no planning phase needed\n")
+	promptBuilder.WriteString("2. Make actual file changes using the available tools\n")
+	promptBuilder.WriteString("3. Test your implementation to ensure it works\n")
+	promptBuilder.WriteString("4. Commit your changes with a descriptive message\n")
+	promptBuilder.WriteString("5. Do not ask for confirmation - proceed with implementation\n")
+
+	return promptBuilder.String()
 }
 
 // CommandResult represents the result of a command execution
@@ -156,9 +189,17 @@ func (c *ClaudeProvider) executeCommand(ctx context.Context, args []string, work
 	cmd := exec.CommandContext(ctx, c.CLIPath, args...)
 	cmd.Dir = workingDir
 
-	// Set environment variables
+	// Set environment variables with explicit permissions
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("CLAUDE_API_KEY=%s", c.APIKey),
+		"CLAUDE_AUTO_APPROVE=true",           // Auto-approve file operations
+		"CLAUDE_PERMISSIONS=all",             // Grant all permissions
+		"CLAUDE_FILE_OPERATIONS=enabled",     // Enable file operations
+		"CLAUDE_GIT_OPERATIONS=enabled",      // Enable git operations
+		"CLAUDE_INTERACTIVE=false",           // Disable interactive prompts
+		"CLAUDE_FORCE_IMPLEMENTATION=true",   // Force implementation mode
+		"CI=true",                           // Indicate CI/automated environment
+		"AUTOMATED_WORKFLOW=true",           // Indicate automated workflow
 	)
 
 	// Debug logging
@@ -252,6 +293,142 @@ func (c *ClaudeProvider) GetClaudeVersion() (string, error) {
 		return "", fmt.Errorf("failed to get Claude version: %w", err)
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+// prepareRepositoryWorkspace uses existing local repository and creates working branch
+func (c *ClaudeProvider) prepareRepositoryWorkspace(ctx context.Context, request *AITaskRequest) (string, error) {
+	// If no repository name, use fallback directory logic
+	if request.RepositoryName == "" {
+		workingDir := request.WorkingDir
+		if workingDir == "" {
+			workingDir = c.WorkingDir
+		}
+		if workingDir == "" {
+			var err error
+			workingDir, err = os.Getwd()
+			if err != nil {
+				return "", fmt.Errorf("failed to get current working directory: %w", err)
+			}
+		}
+		return workingDir, c.ensureWorkingDirectory(workingDir)
+	}
+
+	// Use existing local repository
+	baseDir := "/Users/mac/project/git-repository/JokerTrickster"
+	repositoryDir := filepath.Join(baseDir, request.RepositoryName)
+
+	log.Printf("Using existing repository for %s at %s", request.RepositoryName, repositoryDir)
+
+	// Validate repository exists and is a Git repository
+	if err := c.validateExistingRepository(repositoryDir); err != nil {
+		return "", fmt.Errorf("repository validation failed: %w", err)
+	}
+
+	// Ensure repository is up to date
+	if err := c.updateRepository(ctx, repositoryDir); err != nil {
+		log.Printf("Warning: failed to update repository: %v", err)
+		// Continue with current state if update fails
+	}
+
+	// Create and checkout a working branch
+	timestamp := time.Now().Unix()
+	branchName := fmt.Sprintf("claude-task-%d", timestamp)
+	if err := c.createWorkingBranch(ctx, repositoryDir, branchName); err != nil {
+		log.Printf("Warning: failed to create branch %s: %v", branchName, err)
+		// Continue with current branch if branch creation fails
+	}
+
+	return repositoryDir, nil
+}
+
+// validateExistingRepository validates that a local repository exists and is valid
+func (c *ClaudeProvider) validateExistingRepository(repositoryDir string) error {
+	// Check if directory exists
+	if _, err := os.Stat(repositoryDir); os.IsNotExist(err) {
+		return fmt.Errorf("repository directory does not exist: %s", repositoryDir)
+	}
+
+	// Check if it's a Git repository
+	gitDir := filepath.Join(repositoryDir, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		return fmt.Errorf("directory is not a Git repository: %s", repositoryDir)
+	}
+
+	log.Printf("Repository validation successful: %s", repositoryDir)
+	return nil
+}
+
+// updateRepository updates the repository to latest state
+func (c *ClaudeProvider) updateRepository(ctx context.Context, repositoryDir string) error {
+	log.Printf("Updating repository: %s", repositoryDir)
+
+	// Stash any local changes to avoid conflicts
+	cmd := exec.CommandContext(ctx, "git", "stash")
+	cmd.Dir = repositoryDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("Git stash failed (might be no changes): %v\nOutput: %s", err, string(output))
+	}
+
+	// Checkout main/master branch
+	for _, branch := range []string{"main", "master"} {
+		cmd = exec.CommandContext(ctx, "git", "checkout", branch)
+		cmd.Dir = repositoryDir
+		if _, err := cmd.CombinedOutput(); err == nil {
+			log.Printf("Switched to branch: %s", branch)
+			break
+		} else {
+			log.Printf("Failed to checkout %s: %v", branch, err)
+		}
+	}
+
+	// Pull latest changes
+	cmd = exec.CommandContext(ctx, "git", "pull")
+	cmd.Dir = repositoryDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("Git pull failed: %v\nOutput: %s", err, string(output))
+		return err
+	}
+
+	log.Printf("Repository updated successfully: %s", repositoryDir)
+	return nil
+}
+
+// cloneRepository clones a GitHub repository (kept for backward compatibility)
+func (c *ClaudeProvider) cloneRepository(ctx context.Context, repositoryName, targetDir string) error {
+	githubURL := fmt.Sprintf("https://github.com/%s.git", repositoryName)
+
+	log.Printf("Cloning repository %s to %s", githubURL, targetDir)
+
+	// Remove existing directory if it exists
+	if err := os.RemoveAll(targetDir); err != nil {
+		log.Printf("Failed to remove existing directory: %v", err)
+	}
+
+	// Clone the repository
+	cmd := exec.CommandContext(ctx, "git", "clone", githubURL, targetDir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to clone %s: %w\nOutput: %s", githubURL, err, string(output))
+	}
+
+	log.Printf("Successfully cloned repository %s", repositoryName)
+	return nil
+}
+
+// createWorkingBranch creates and checks out a new branch
+func (c *ClaudeProvider) createWorkingBranch(ctx context.Context, workingDir, branchName string) error {
+	log.Printf("Creating working branch: %s", branchName)
+
+	cmd := exec.CommandContext(ctx, "git", "checkout", "-b", branchName)
+	cmd.Dir = workingDir
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create branch %s: %w\nOutput: %s", branchName, err, string(output))
+	}
+
+	log.Printf("Successfully created and switched to branch: %s", branchName)
+	return nil
 }
 
 // ensureWorkingDirectory creates the working directory if it doesn't exist

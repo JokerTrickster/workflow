@@ -43,10 +43,12 @@ type AITaskRequest struct {
 type AITaskResponse struct {
 	// Response content
 	Content string `json:"content"`
+	Output  string `json:"output,omitempty"`
 
 	// Execution results
-	Success bool   `json:"success"`
-	Error   string `json:"error,omitempty"`
+	Success       bool     `json:"success"`
+	Error         string   `json:"error,omitempty"`
+	FilesModified []string `json:"files_modified,omitempty"`
 
 	// Usage information
 	TokensUsed      int           `json:"tokens_used,omitempty"`
