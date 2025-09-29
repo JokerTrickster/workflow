@@ -216,6 +216,9 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
 
   // Task functions (enhanced with domain layer integration)
   const handleCreateTask = async (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+    // Prevent duplicate requests
+    if (isCreatingTask) return;
+
     setIsCreatingTask(true);
     try {
       // Determine epic name from GitHub issue/PR or use default
@@ -323,6 +326,9 @@ Task created on ${new Date().toISOString()}`;
       setSelectedGitHubIssue(undefined);
       setSelectedGitHubPR(undefined);
       setActiveSubTab('tasks'); // Switch to tasks tab to show the new task
+
+      // Auto-refresh tasks list
+      refetch();
     } catch (error) {
       console.error('Failed to create task:', error);
       
@@ -377,8 +383,8 @@ Task created on ${new Date().toISOString()}`;
       // Log task execution started
       activityLogger.logTaskStarted(taskToExecute.id, taskToExecute.title);
 
-      // Reload tasks to reflect changes
-      await loadTasks();
+      // Auto-refresh tasks list
+      refetch();
     } catch (error) {
       console.error('Failed to execute task:', error);
     } finally {
@@ -697,12 +703,6 @@ Task created on ${new Date().toISOString()}`;
                       <a href={task.pr_url} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="h-4 w-4" />
                       </a>
-                    </Button>
-                  )}
-                  {task.status === 'pending' && (
-                    <Button size="sm" onClick={() => handleExecuteTaskClick(task.id)}>
-                      <Play className="h-4 w-4 mr-2" />
-                      Execute
                     </Button>
                   )}
                 </div>
