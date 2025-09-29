@@ -1,5 +1,7 @@
 ---
-last_sync: "2025-09-26T17:16:17.214488Z"
+github: "https://github.com/JokerTrickster/workflow/issues/83"
+last_sync: "2025-09-29T01:37:00Z"
+status: open
 ---
 # Task #72: Task History API Endpoint Implementation Plan
 
