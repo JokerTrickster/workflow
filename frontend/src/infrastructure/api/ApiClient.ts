@@ -30,7 +30,6 @@ class ApiClient {
     }
 
     const config: RequestInit = {
-      timeout: 10000, // 10초 타임아웃
       ...options,
       headers: {
         ...defaultHeaders,
@@ -40,7 +39,7 @@ class ApiClient {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), config.timeout as number);
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
 
       const response = await fetch(url, {
         ...config,

@@ -164,9 +164,10 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
   const [linkedTasksFilter, setLinkedTasksFilter] = useState<'all' | 'linked' | 'unlinked'>('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // GitHub API calls
+  // GitHub API setup
   const repoId = repository.full_name;
-  
+  const shouldEnableGitHub = repository.is_connected && !!repository.full_name;
+
   const {
     data: issuesData,
     isLoading: issuesLoading,
@@ -176,7 +177,7 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
   } = useGitHubIssues({
     repoId,
     params: { state: issuesFilter, per_page: 20 },
-    enabled: repository.is_connected && activeSubTab === 'issues'
+    enabled: shouldEnableGitHub // 항상 활성화하여 탭 변경 시 바로 로드
   });
 
   const {
@@ -188,8 +189,30 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
   } = useGitHubPullRequests({
     repoId,
     params: { state: prsFilter, per_page: 20 },
-    enabled: repository.is_connected && activeSubTab === 'prs'
+    enabled: shouldEnableGitHub // 항상 활성화하여 탭 변경 시 바로 로드
   });
+
+  // Auto-refetch GitHub data when switching tabs - force refresh every time
+  useEffect(() => {
+    if (shouldEnableGitHub) {
+      try {
+        // Add a small delay to ensure hooks are ready
+        const timeoutId = setTimeout(() => {
+          if (activeTab === 'issues') {
+            console.log('🔄 Auto-refetching GitHub issues on tab switch');
+            refetchIssues();
+          } else if (activeTab === 'prs') {
+            console.log('🔄 Auto-refetching GitHub PRs on tab switch');
+            refetchPRs();
+          }
+        }, 100); // 100ms delay
+
+        return () => clearTimeout(timeoutId);
+      } catch (error) {
+        console.error('Error refetching GitHub data:', error);
+      }
+    }
+  }, [activeTab, shouldEnableGitHub, refetchIssues, refetchPRs]);
 
   // Task functions (enhanced with domain layer integration)
   const handleCreateTask = async (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {

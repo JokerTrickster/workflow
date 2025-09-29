@@ -5,22 +5,22 @@ import { Task } from '../domain/entities/Task';
 import { ApiDataSourceImpl } from '../data/datasources/ApiDataSourceImpl';
 
 interface UseTasksParams {
-  repositoryId: number;
+  repositoryName: string;
   enabled?: boolean;
 }
 
-export function useTasks({ repositoryId, enabled = true }: UseTasksParams) {
+export function useTasks({ repositoryName, enabled = true }: UseTasksParams) {
   const queryClient = useQueryClient();
   const apiDataSource = new ApiDataSourceImpl();
 
-  const queryKey = ['tasks', repositoryId];
+  const queryKey = ['tasks', repositoryName];
 
   const query = useQuery({
     queryKey,
     queryFn: async (): Promise<Task[]> => {
-      return await apiDataSource.getTasks(repositoryId);
+      return await apiDataSource.getTasks(repositoryName);
     },
-    enabled: enabled && !!repositoryId,
+    enabled: enabled && !!repositoryName,
     staleTime: 30 * 1000, // 30 seconds
     refetchOnWindowFocus: false,
     retry: (failureCount, error) => {
