@@ -10,20 +10,21 @@ import (
 // 프론트엔드에서 보여주는 정보만 저장
 type WorkflowHistories struct {
 	ID        uint64 `json:"id" gorm:"primaryKey;column:id"`
-	RequestID string `json:"request_id" gorm:"column:request_id;uniqueIndex"`
-	Status    string `json:"status" gorm:"column:status;index;default:pending"`
+	RequestID string `json:"request_id" gorm:"column:request_id;type:varchar(255);uniqueIndex"`
+	Status    string `json:"status" gorm:"column:status;type:varchar(50);index;default:pending"`
 
 	// 요청 정보 (프론트엔드 입력값)
 	Tasks          string  `json:"tasks" gorm:"column:tasks;type:text;not null"`
-	RepositoryName string  `json:"repository_name" gorm:"column:repository_name;index;not null"`
+	RepositoryName string  `json:"repository_name" gorm:"column:repository_name;type:varchar(255);index;not null"`
 	WorkingDir     *string `json:"working_dir,omitempty" gorm:"column:working_dir"`
 	Cmd            *string `json:"cmd,omitempty" gorm:"column:cmd"`
 	Interactive    bool    `json:"interactive" gorm:"column:interactive;default:false"`
 	ContinueTask   bool    `json:"continue_task" gorm:"column:continue_task;default:false"`
-	Provider       string  `json:"provider" gorm:"column:provider;not null"`
+	Provider       string  `json:"provider" gorm:"column:provider;type:varchar(50);not null"`
 
 	// 실행 시간 정보
 	CreatedAt        time.Time  `json:"created_at" gorm:"column:created_at;index"`
+	UpdatedAt        time.Time  `json:"updated_at" gorm:"column:updated_at"`
 	CompletedAt      *time.Time `json:"completed_at,omitempty" gorm:"column:completed_at"`
 	ProcessingTimeMs *int64     `json:"processing_time_ms,omitempty" gorm:"column:processing_time_ms"`
 

@@ -184,6 +184,12 @@ func (w *ConcurrentTaskWorker) handleMessageConcurrent(ctx context.Context, msg 
 		return
 	}
 
+	// Update task status to "processing" in database before starting execution
+	if err := w.updateTaskStatusInDB(&taskMsg, "processing"); err != nil {
+		log.Printf("Warning: Failed to update task status to processing: %v", err)
+		// Continue with task execution even if DB update fails
+	}
+
 	// Create GitHub issue before task execution
 	issueURL, issueNumber, err := w.createGitHubIssue(ctx, &taskMsg)
 	if err != nil {
@@ -210,6 +216,11 @@ func (w *ConcurrentTaskWorker) handleMessageConcurrent(ctx context.Context, msg 
 		}
 
 		w.recordTaskFailure(&taskMsg, err.Error())
+
+		// Update task status to "failed" in database
+		if updateErr := w.updateTaskStatusInDB(&taskMsg, "failed"); updateErr != nil {
+			log.Printf("Warning: Failed to update task status to failed: %v", updateErr)
+		}
 
 		// Mark branch as completed (failed)
 		if branchInfo != nil {
@@ -258,6 +269,11 @@ func (w *ConcurrentTaskWorker) handleMessageConcurrent(ctx context.Context, msg 
 			}
 			// Still acknowledge the task as completed, PR creation is optional
 		}
+	}
+
+	// Update task status to "completed" in database
+	if updateErr := w.updateTaskStatusInDB(&taskMsg, "completed"); updateErr != nil {
+		log.Printf("Warning: Failed to update task status to completed: %v", updateErr)
 	}
 
 	// Acknowledge successful processing
@@ -685,4 +701,53 @@ func (w *ConcurrentTaskWorker) recordTaskFailure(taskMsg *TaskMessage, errorMsg 
 	} else {
 		log.Printf("Recorded task failure to database with request_id: %s", requestID)
 	}
+}
+
+// updateTaskStatusInDB updates the task status in database
+func (w *ConcurrentTaskWorker) updateTaskStatusInDB(taskMsg *TaskMessage, status string) error {
+	if w.db == nil {
+		log.Printf("Database connection not available for status update")
+		return nil // Don't fail task execution if DB is not available
+	}
+
+	// If no RequestID, try to find by tasks and repository name
+	var requestID string
+	if taskMsg.RequestID != "" {
+		requestID = taskMsg.RequestID
+	} else {
+		// Fallback: find by tasks and repository name (not recommended for production)
+		var workflow mysql.WorkflowHistories
+		err := w.db.Where("tasks = ? AND repository_name = ? AND status IN (?)",
+			taskMsg.Tasks, taskMsg.RepositoryName, []string{"pending", "processing"}).
+			Order("created_at DESC").First(&workflow).Error
+		if err != nil {
+			log.Printf("Failed to find workflow by tasks and repository: %v", err)
+			return err
+		}
+		requestID = workflow.RequestID
+	}
+
+	// Check if database is available
+	if w.db == nil {
+		log.Printf("Database not available, skipping status update")
+		return nil
+	}
+
+	// Update status
+	result := w.db.Model(&mysql.WorkflowHistories{}).
+		Where("request_id = ?", requestID).
+		Update("status", status)
+
+	if result.Error != nil {
+		log.Printf("Failed to update task status in database: %v", result.Error)
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		log.Printf("No rows affected when updating status for request_id: %s", requestID)
+		return fmt.Errorf("no task found with request_id: %s", requestID)
+	}
+
+	log.Printf("Updated task status to '%s' for request_id: %s", status, requestID)
+	return nil
 }
