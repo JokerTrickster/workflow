@@ -405,10 +405,9 @@ func (w *ConcurrentTaskWorker) shouldCreatePR(result *AITaskResponse) bool {
 func (w *ConcurrentTaskWorker) commitAndPushChanges(ctx context.Context, taskMsg *TaskMessage, result *AITaskResponse) error {
 	log.Printf("Committing and pushing changes for task: %s", taskMsg.Tasks)
 
-	workingDir := taskMsg.WorkingDir
-	if workingDir == "" {
-		return fmt.Errorf("working directory is required for Git operations")
-	}
+	// Calculate actual repository path instead of using taskMsg.WorkingDir (which might be branch name)
+	workingDir := fmt.Sprintf("../../git-repository/JokerTrickster/%s", taskMsg.RepositoryName)
+	log.Printf("Using actual working directory for Git operations: %s", workingDir)
 
 	// Validate that this is a Git repository (Claude provider should have set this up)
 	gitDir := filepath.Join(workingDir, ".git")
@@ -523,8 +522,13 @@ func (w *ConcurrentTaskWorker) cloneOrInitRepository(ctx context.Context, reposi
 func (w *ConcurrentTaskWorker) createPullRequest(ctx context.Context, taskMsg *TaskMessage, result *AITaskResponse, issueNumber string) error {
 	log.Printf("Creating PR for completed task: %s", taskMsg.Tasks)
 
-	// Create PR creator instance
-	prCreator := NewPRCreator(taskMsg.WorkingDir, taskMsg.RepositoryName)
+	// Calculate actual repository path instead of using taskMsg.WorkingDir (which might be branch name)
+	actualWorkingDir := fmt.Sprintf("../../git-repository/JokerTrickster/%s", taskMsg.RepositoryName)
+	log.Printf("Starting PR creation process for task: %s", taskMsg.Tasks)
+	log.Printf("Using actual working directory: %s", actualWorkingDir)
+
+	// Create PR creator instance with actual repository directory
+	prCreator := NewPRCreator(actualWorkingDir, taskMsg.RepositoryName)
 
 	// Create the pull request with issue linking
 	if err := prCreator.CreatePRForCompletedTaskWithIssue(ctx, taskMsg, result, issueNumber); err != nil {
