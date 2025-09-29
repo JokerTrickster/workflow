@@ -7,6 +7,23 @@
 - **GitHub URL**: https://github.com/JokerTrickster/workflow
 - **Project**: workflow
 
+## 🚨 PORT CONFIGURATION - DO NOT CHANGE
+- **Frontend**: 4000번 포트 (절대 변경 금지)
+- **Backend**: 7000번 포트 (절대 변경 금지)
+- **Local-backend**: 7001번 포트 (절대 변경 금지)
+- **MySQL**: 3306번 포트
+- **RabbitMQ**: 5672번 포트
+
+포트번호는 .env 파일에 설정된 대로만 사용하며, 절대 임의로 변경하지 않는다.
+
+## 🚨 DATABASE & MESSAGING CONFIGURATION - DO NOT CHANGE
+- **MySQL Host**: 13.203.37.93 (절대 localhost 사용 금지)
+- **RabbitMQ Host**: 13.203.37.93 (절대 localhost 사용 금지)
+- **MySQL Connection**: root:examplepassword@tcp(13.203.37.93:3306)/dev_workflow
+- **RabbitMQ Connection**: amqp://board:examplepassword@13.203.37.93:5672/
+
+로컬호스트(localhost)가 아닌 13.203.37.93 서버를 반드시 사용해야 하며, 절대 임의로 변경하지 않는다.
+
 ## CCPM Integration (Claude Code PM)
 This project uses CCPM for structured project management with AI agents. 
 

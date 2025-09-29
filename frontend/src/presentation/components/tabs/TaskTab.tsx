@@ -125,21 +125,13 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
     }
   }, [repository.name]);
 
-  // Poll for task status updates when there are in_progress tasks
+  // Load tasks when tab becomes active (on tab change)
   useEffect(() => {
-    const hasInProgressTasks = tasks.some(task => task.status === 'in_progress');
-
-    if (!hasInProgressTasks) {
-      return;
+    if (activeTab === 'tasks' || activeSubTab === 'tasks') {
+      console.log('🔄 Tab switched to tasks, refreshing task list');
+      loadTasks();
     }
-
-    const pollInterval = setInterval(async () => {
-      console.log('Polling for task status updates...');
-      await loadTasks();
-    }, 5000); // Poll every 5 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [tasks, loadTasks]);
+  }, [activeTab, activeSubTab, loadTasks]);
 
   // Handle task detail viewing
   const handleTaskClick = async (task: Task) => {
@@ -273,8 +265,9 @@ Task created on ${new Date().toISOString()}`;
       const taskCreateRequest = {
         tasks: taskData.description, // Main task description
         repository_name: repository.name,
+        working_dir: `JokerTrickster/${repository.name}`, // Repository path for actual work
+        branch_name: taskData.branch_name || '', // User input for branch name
         provider: 'claude',
-        working_dir: taskData.branch_name || '',
         cmd: '',
         interactive: false
       };
@@ -338,7 +331,7 @@ Task created on ${new Date().toISOString()}`;
       console.log('Executing task:', taskToExecute.id);
 
       // Use direct API call with explicit POST method
-      const response = await fetch(`http://localhost:7000/api/v1/tasks/${taskToExecute.id}/execute`, {
+      const response = await fetch(apiConfig.endpoints.tasks.execute(taskToExecute.id), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -393,7 +386,7 @@ Task created on ${new Date().toISOString()}`;
     switch (status) {
       case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'in_progress':
+      case 'processing':
         return <Clock className="h-4 w-4 text-yellow-500" />;
       case 'failed':
         return <XCircle className="h-4 w-4 text-red-500" />;
@@ -406,7 +399,7 @@ Task created on ${new Date().toISOString()}`;
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-800';
-      case 'in_progress':
+      case 'processing':
         return 'bg-yellow-100 text-yellow-800';
       case 'failed':
         return 'bg-red-100 text-red-800';
@@ -1339,20 +1332,12 @@ Task created on ${new Date().toISOString()}`;
                 <Button 
                   onClick={async () => {
                     try {
-                      // Call backend API to start the task
-                      const response = await fetch(apiConfig.endpoints.tasks.create(), {
+                      // Call backend API to execute the task
+                      const response = await fetch(apiConfig.endpoints.tasks.execute(selectedTask.id), {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                          tasks: selectedTask.description || selectedTask.title,
-                          repository_name: repository.name,
-                          provider: 'claude',
-                          working_dir: undefined,
-                          cmd: undefined,
-                          interactive: false
-                        })
+                        }
                       });
 
                       if (!response.ok) {
@@ -1368,7 +1353,7 @@ Task created on ${new Date().toISOString()}`;
                       setTasks(prevTasks =>
                         prevTasks.map(task =>
                           task.id === selectedTask.id
-                            ? { ...task, status: 'in_progress' }
+                            ? { ...task, status: 'processing' }
                             : task
                         )
                       );
@@ -1390,8 +1375,8 @@ Task created on ${new Date().toISOString()}`;
                 </Button>
               )}
 
-              {/* In Progress Task Actions */}
-              {selectedTask.status === 'in_progress' && (
+              {/* Processing Task Actions */}
+              {selectedTask.status === 'processing' && (
                 <>
                   <Button 
                     variant="destructive"

@@ -48,6 +48,7 @@ func (uc *ExecuteTaskUseCase) ExecuteTask(requestID string) (*response.ExecuteTa
 	}
 
 	taskMessage := &utils.TaskMessage{
+		RequestID:      requestID,
 		Tasks:          task.Tasks,
 		RepositoryName: task.RepositoryName,
 		WorkingDir:     workingDir,
