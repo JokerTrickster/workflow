@@ -255,35 +255,7 @@ ${selectedGitHubIssue ? `## GitHub Issue
 ## Notes
 Task created on ${new Date().toISOString()}`;
 
-      // 1. Create task in backend database
-      try {
-        const apiResponse = await fetch(apiConfig.endpoints.tasks.create(), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            tasks: taskData.description,
-            repository_name: repository.name,
-            provider: taskData.provider || 'claude',
-            working_dir: taskData.branch_name || undefined,
-            cmd: undefined,
-            interactive: false
-          })
-        });
-
-        if (apiResponse.ok) {
-          const apiResult = await apiResponse.json();
-          console.log('✅ Task created in database:', apiResult.request_id);
-        } else {
-          console.warn('⚠️ Failed to save task to database:', await apiResponse.text());
-        }
-      } catch (apiError) {
-        console.error('❌ Database API error:', apiError);
-        // Continue with file creation even if API fails
-      }
-
-      // 2. Create task file (existing functionality)
+      // Create task file (existing functionality)
       const taskFile = await taskFileManager.createTaskFile({
         title: taskData.title,
         status: taskData.status,
