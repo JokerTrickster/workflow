@@ -1310,8 +1310,8 @@ Task created on ${new Date().toISOString()}`;
                 <Button 
                   onClick={async () => {
                     try {
-                      // Call /api/v1/tasks [POST] to start the task
-                      const response = await fetch('/api/v1/tasks', {
+                      // Call backend API to start the task
+                      const response = await fetch(apiConfig.endpoints.tasks.create(), {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',
