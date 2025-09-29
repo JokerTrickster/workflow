@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Repository } from '../../../domain/entities/Repository';
 import { Task } from '../../../domain/entities/Task';
 import { TaskCreationForm } from '../../../components/TaskCreationForm';
-import { ActivityLogger } from '../../../services/ActivityLogger';
 import { TaskFileManager } from '../../../services/TaskFileManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Button } from '../../../components/ui/button';
@@ -89,7 +88,7 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
     loadTasks();
   }, [repository.id, repository.name]); // Reload when repository changes
 
-  const loadTasks = useCallback(async (forceRefresh = true) => {
+  const loadTasks = useCallback(async () => {
     setIsLoadingTasks(true);
     try {
       // Load tasks from backend API
@@ -255,7 +254,7 @@ ${selectedGitHubIssue ? `## GitHub Issue
 Task created on ${new Date().toISOString()}`;
 
       // Create task file (existing functionality)
-      const taskFile = await taskFileManager.createTaskFile({
+      await taskFileManager.createTaskFile({
         title: taskData.title,
         status: taskData.status,
         repository: repository.name, // Use actual repository name
@@ -264,8 +263,8 @@ Task created on ${new Date().toISOString()}`;
         tokensUsed: 0,
         githubIssue: selectedGitHubIssue?.number,
         prUrl: taskData.pr_url,
-        buildStatus: taskData.build_status,
-        lintStatus: taskData.lint_status,
+        buildStatus: undefined,
+        lintStatus: undefined,
       }, taskContent, repository.name);
 
       // Reload tasks to show the new one
@@ -291,7 +290,7 @@ Task created on ${new Date().toISOString()}`;
       setActiveSubTab('tasks'); // Switch to tasks tab to show the new task
 
       // Auto-refresh tasks list
-      refetch();
+      await loadTasks();
     } catch (error) {
       console.error('Failed to create task:', error);
       
@@ -299,14 +298,6 @@ Task created on ${new Date().toISOString()}`;
     } finally {
       setIsCreatingTask(false);
     }
-  };
-
-  const handleExecuteTaskClick = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-
-    setTaskToExecute(task);
-    setShowExecuteDialog(true);
   };
 
   const handleConfirmExecuteTask = async () => {
@@ -337,7 +328,7 @@ Task created on ${new Date().toISOString()}`;
       console.log('Task execution result:', result);
 
       // Auto-refresh tasks list
-      refetch();
+      await loadTasks();
     } catch (error) {
       console.error('Failed to execute task:', error);
     } finally {
@@ -1319,10 +1310,35 @@ Task created on ${new Date().toISOString()}`;
                 <Button 
                   onClick={async () => {
                     try {
-                      // Update task status to in_progress
+                      // Call /api/v1/tasks [POST] to start the task
+                      const response = await fetch('/api/v1/tasks', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          tasks: selectedTask.description || selectedTask.title,
+                          repository_name: repository.name,
+                          provider: 'claude',
+                          working_dir: undefined,
+                          cmd: undefined,
+                          interactive: false
+                        })
+                      });
+
+                      if (!response.ok) {
+                        const errorData = await response.text();
+                        console.error('Start task API failed:', errorData);
+                        throw new Error(`Start task API failed: ${errorData}`);
+                      }
+
+                      const result = await response.json();
+                      console.log('Task started:', result);
+
+                      // Update task status to in_progress in file
                       await taskFileManager.updateTaskFile(
                         selectedTask.id,
-                        { 
+                        {
                           status: 'in_progress',
                           startedAt: new Date().toISOString()
                         },
@@ -1332,7 +1348,7 @@ Task created on ${new Date().toISOString()}`;
 
                       // Refresh tasks list
                       await loadTasks();
-                      
+
                       handleCloseTaskDetail();
                     } catch (error) {
                       console.error('Failed to start task:', error);
@@ -1354,9 +1370,8 @@ Task created on ${new Date().toISOString()}`;
                         // Update task status to cancelled
                         await taskFileManager.updateTaskFile(
                           selectedTask.id,
-                          { 
-                            status: 'cancelled',
-                            cancelledAt: new Date().toISOString()
+                          {
+                            status: 'failed'
                           },
                           undefined,
                           repository.name
