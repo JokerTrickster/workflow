@@ -44,11 +44,10 @@ func (p *PRCreator) CreatePRForCompletedTaskWithIssue(ctx context.Context, taskM
 		return fmt.Errorf("environment validation failed: %w", err)
 	}
 
-	// Step 2: Check if we're in the correct working directory
+	// Step 2: Use the provided working directory (already calculated correctly)
+	// Note: taskMsg.WorkingDir is the branch name, not the actual directory path
 	workDir := p.workingDir
-	if taskMsg.WorkingDir != "" {
-		workDir = taskMsg.WorkingDir
-	}
+	log.Printf("Using working directory for PR creation: %s", workDir)
 
 	if err := p.changeToWorkingDirectory(workDir); err != nil {
 		return fmt.Errorf("failed to change to working directory: %w", err)
