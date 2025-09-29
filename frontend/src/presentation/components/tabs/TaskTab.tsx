@@ -125,6 +125,22 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
     }
   }, [repository.name]);
 
+  // Poll for task status updates when there are in_progress tasks
+  useEffect(() => {
+    const hasInProgressTasks = tasks.some(task => task.status === 'in_progress');
+
+    if (!hasInProgressTasks) {
+      return;
+    }
+
+    const pollInterval = setInterval(async () => {
+      console.log('Polling for task status updates...');
+      await loadTasks();
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [tasks, loadTasks]);
+
   // Handle task detail viewing
   const handleTaskClick = async (task: Task) => {
     try {
@@ -253,19 +269,32 @@ ${selectedGitHubIssue ? `## GitHub Issue
 ## Notes
 Task created on ${new Date().toISOString()}`;
 
-      // Create task file (existing functionality)
-      await taskFileManager.createTaskFile({
-        title: taskData.title,
-        status: taskData.status,
-        repository: repository.name, // Use actual repository name
-        epic: epicName,
-        branch: taskData.branch_name,
-        tokensUsed: 0,
-        githubIssue: selectedGitHubIssue?.number,
-        prUrl: taskData.pr_url,
-        buildStatus: undefined,
-        lintStatus: undefined,
-      }, taskContent, repository.name);
+      // Create task via backend API (correct format)
+      const taskCreateRequest = {
+        tasks: taskData.description, // Main task description
+        repository_name: repository.name,
+        provider: 'claude',
+        working_dir: taskData.branch_name || '',
+        cmd: '',
+        interactive: false
+      };
+
+      const response = await fetch(apiConfig.endpoints.tasks.create(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(taskCreateRequest)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Task creation API failed:', errorData);
+        throw new Error(`Task creation API failed: ${errorData}`);
+      }
+
+      const result = await response.json();
+      console.log('Task created:', result);
 
       // Reload tasks to show the new one
       await loadTasks();
@@ -658,7 +687,7 @@ Task created on ${new Date().toISOString()}`;
                 <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    {new Date(task.created_at).toLocaleDateString()}
+                    {new Date(task.created_at).toLocaleString()}
                   </div>
                   {task.ai_tokens_used && (
                     <div>Tokens: {task.ai_tokens_used.toLocaleString()}</div>
@@ -1136,12 +1165,12 @@ Task created on ${new Date().toISOString()}`;
                         <div className="flex flex-wrap items-center gap-4">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            Created {new Date(item.created_at).toLocaleDateString()}
+                            Created {new Date(item.created_at).toLocaleString()}
                           </div>
                           {item.updated_at !== item.created_at && (
                             <div className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              Updated {new Date(item.updated_at).toLocaleDateString()}
+                              Updated {new Date(item.updated_at).toLocaleString()}
                             </div>
                           )}
                           <div className="flex items-center gap-1">
@@ -1257,7 +1286,7 @@ Task created on ${new Date().toISOString()}`;
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Created</label>
                 <div className="mt-1 text-sm">
-                  {new Date(selectedTask.created_at).toLocaleDateString()}
+                  {new Date(selectedTask.created_at).toLocaleString()}
                 </div>
               </div>
               
@@ -1335,21 +1364,22 @@ Task created on ${new Date().toISOString()}`;
                       const result = await response.json();
                       console.log('Task started:', result);
 
-                      // Update task status to in_progress in file
-                      await taskFileManager.updateTaskFile(
-                        selectedTask.id,
-                        {
-                          status: 'in_progress',
-                          startedAt: new Date().toISOString()
-                        },
-                        undefined,
-                        repository.name
+                      // Immediately update task status in frontend for responsive UI
+                      setTasks(prevTasks =>
+                        prevTasks.map(task =>
+                          task.id === selectedTask.id
+                            ? { ...task, status: 'in_progress' }
+                            : task
+                        )
                       );
 
-                      // Refresh tasks list
-                      await loadTasks();
-
+                      // Close modal immediately
                       handleCloseTaskDetail();
+
+                      // Refresh tasks list after a delay to get actual backend status
+                      setTimeout(async () => {
+                        await loadTasks();
+                      }, 1000);
                     } catch (error) {
                       console.error('Failed to start task:', error);
                     }
@@ -1367,18 +1397,9 @@ Task created on ${new Date().toISOString()}`;
                     variant="destructive"
                     onClick={async () => {
                       try {
-                        // Update task status to cancelled
-                        await taskFileManager.updateTaskFile(
-                          selectedTask.id,
-                          {
-                            status: 'failed'
-                          },
-                          undefined,
-                          repository.name
-                        );
                         // Refresh tasks list
                         await loadTasks();
-                        
+
                         handleCloseTaskDetail();
                       } catch (error) {
                         console.error('Failed to cancel task:', error);
