@@ -144,12 +144,12 @@ func (c *ClaudeProvider) buildEnhancedPrompt(request *AITaskRequest, originalPro
 	promptBuilder.WriteString("- IMPLEMENT the requested changes immediately and completely\n")
 	promptBuilder.WriteString("- CREATE new files when needed for the implementation\n")
 	promptBuilder.WriteString("- MODIFY existing files to implement the requested functionality\n")
-	promptBuilder.WriteString("- COMMIT your changes using git when you're done\n\n")
+	promptBuilder.WriteString("- DO NOT commit or push changes - the system will handle that automatically\n\n")
 
 	// Add repository context if available
 	if request.RepositoryName != "" {
 		promptBuilder.WriteString(fmt.Sprintf("REPOSITORY: %s\n", request.RepositoryName))
-		promptBuilder.WriteString("You are working in a real Git repository. All changes will be automatically committed and pushed.\n\n")
+		promptBuilder.WriteString("You are working in a real Git repository. Focus only on making the code changes.\n\n")
 	}
 
 	// Add working directory context
@@ -177,7 +177,7 @@ func (c *ClaudeProvider) buildEnhancedPrompt(request *AITaskRequest, originalPro
 	promptBuilder.WriteString("1. Start implementing immediately - no planning phase needed\n")
 	promptBuilder.WriteString("2. Make actual file changes using the available tools\n")
 	promptBuilder.WriteString("3. Test your implementation to ensure it works\n")
-	promptBuilder.WriteString("4. Commit your changes with a descriptive message\n")
+	promptBuilder.WriteString("4. Do not commit or push - just make the code changes\n")
 	promptBuilder.WriteString("5. Do not ask for confirmation - proceed with implementation\n")
 
 	return promptBuilder.String()
