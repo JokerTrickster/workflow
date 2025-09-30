@@ -528,13 +528,50 @@ func (c *ClaudeProvider) ensureCommitAndPush(ctx context.Context, workingDir str
 	if !branchExistsOnRemote || hasUncommittedChanges {
 		log.Printf("Pushing branch %s to remote...", branchName)
 
+		// Get GitHub token from environment
+		githubToken := os.Getenv("GITHUB_TOKEN")
+		if githubToken == "" {
+			log.Printf("Warning: GITHUB_TOKEN not set, push may fail for private repositories")
+		}
+
+		// Temporarily set remote URL with token for authenticated push
+		var originalRemoteURL string
+		if githubToken != "" {
+			// Get current remote URL
+			getRemoteCmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
+			getRemoteCmd.Dir = workingDir
+			remoteURLBytes, err := getRemoteCmd.CombinedOutput()
+			if err == nil {
+				originalRemoteURL = strings.TrimSpace(string(remoteURLBytes))
+
+				// Set remote URL with token
+				authenticatedURL := strings.Replace(originalRemoteURL, "https://", fmt.Sprintf("https://x-access-token:%s@", githubToken), 1)
+				setRemoteCmd := exec.CommandContext(ctx, "git", "remote", "set-url", "origin", authenticatedURL)
+				setRemoteCmd.Dir = workingDir
+				if output, err := setRemoteCmd.CombinedOutput(); err != nil {
+					log.Printf("Warning: Failed to set authenticated remote URL: %v\nOutput: %s", err, string(output))
+				}
+			}
+		}
+
 		// Push with timeout
 		pushCtx, pushCancel := context.WithTimeout(ctx, 3*time.Minute)
 		defer pushCancel()
 
 		pushCmd := exec.CommandContext(pushCtx, "git", "push", "--set-upstream", "origin", branchName)
 		pushCmd.Dir = workingDir
-		if output, err := pushCmd.CombinedOutput(); err != nil {
+		output, err := pushCmd.CombinedOutput()
+
+		// Restore original remote URL if we changed it
+		if originalRemoteURL != "" && githubToken != "" {
+			restoreCmd := exec.Command("git", "remote", "set-url", "origin", originalRemoteURL)
+			restoreCmd.Dir = workingDir
+			if restoreOutput, restoreErr := restoreCmd.CombinedOutput(); restoreErr != nil {
+				log.Printf("Warning: Failed to restore original remote URL: %v\nOutput: %s", restoreErr, string(restoreOutput))
+			}
+		}
+
+		if err != nil {
 			return fmt.Errorf("failed to push branch %s: %w\nOutput: %s", branchName, err, string(output))
 		}
 
