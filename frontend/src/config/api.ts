@@ -40,13 +40,8 @@ interface ApiConfig {
  * Get API base URL from environment variables
  */
 const getApiBaseUrl = (): string => {
-  // For server-side rendering (Next.js API routes)
-  if (typeof window === 'undefined') {
-    return process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
-  }
-
-  // For client-side - use Next.js API routes
-  return '/api/v1';
+  // Always use direct backend URL (7000 port)
+  return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:7000/api/v1';
 };
 
 /**

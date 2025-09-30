@@ -12,10 +12,10 @@ func GetRepositoryBasePath() string {
 		return basePath
 	}
 
-	// Use relative path from current project directory
+	// Use absolute path to git-repository
 	// Current path: /Users/luxrobo/project/workflow/local-backend
 	// Target path: /Users/luxrobo/project/git-repository
-	return "../../git-repository"
+	return "/Users/luxrobo/project/git-repository"
 }
 
 // GetRepositoryPath returns the full path for a specific repository

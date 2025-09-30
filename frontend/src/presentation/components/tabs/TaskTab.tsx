@@ -125,6 +125,9 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
     }
   }, [repository.name]);
 
+  // Sub-tab state needs to be declared before useEffect
+  const [activeSubTab, setActiveSubTab] = useState('tasks');
+
   // Load tasks when tab becomes active (on tab change)
   useEffect(() => {
     if (activeTab === 'tasks' || activeSubTab === 'tasks') {
@@ -162,7 +165,6 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
   const [issuesFilter, setIssuesFilter] = useState<'all' | 'open' | 'closed'>('open');
   const [prsFilter, setPrsFilter] = useState<'all' | 'open' | 'closed'>('open');
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState('tasks');
   
   // Enhanced filtering state
   const [labelFilter, setLabelFilter] = useState<string>('');

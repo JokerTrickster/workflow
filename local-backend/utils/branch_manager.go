@@ -69,8 +69,15 @@ func (bm *BranchManager) CreateTaskBranch(ctx context.Context, taskMsg *TaskMess
 		// In the future, we could implement queuing or branch merging
 	}
 
-	// Generate unique branch name
-	branchName := bm.generateUniqueBranchName(taskMsg)
+	// Use requested branch name or generate unique one
+	var branchName string
+	if taskMsg.BranchName != "" {
+		branchName = taskMsg.BranchName
+		log.Printf("Using requested branch name: %s", branchName)
+	} else {
+		branchName = bm.generateUniqueBranchName(taskMsg)
+		log.Printf("Generated branch name: %s", branchName)
+	}
 
 	// Create branch info
 	branchInfo := &BranchInfo{
@@ -82,8 +89,9 @@ func (bm *BranchManager) CreateTaskBranch(ctx context.Context, taskMsg *TaskMess
 		IsActive:   true,
 	}
 
-	// Create the actual Git branch
-	if err := bm.createGitBranch(ctx, taskMsg.WorkingDir, branchName); err != nil {
+	// Create the actual Git branch using absolute path
+	repoPath := GetRepositoryPath(taskMsg.RepositoryName)
+	if err := bm.createGitBranch(ctx, repoPath, branchName); err != nil {
 		return nil, fmt.Errorf("failed to create Git branch: %w", err)
 	}
 

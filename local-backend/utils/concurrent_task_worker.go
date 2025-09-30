@@ -522,8 +522,8 @@ func (w *ConcurrentTaskWorker) cloneOrInitRepository(ctx context.Context, reposi
 func (w *ConcurrentTaskWorker) createPullRequest(ctx context.Context, taskMsg *TaskMessage, result *AITaskResponse, issueNumber string) error {
 	log.Printf("Creating PR for completed task: %s", taskMsg.Tasks)
 
-	// Use the working directory from taskMsg (already contains proper path)
-	actualWorkingDir := fmt.Sprintf("../../git-repository/%s", taskMsg.WorkingDir)
+	// Use absolute path for PR creation
+	actualWorkingDir := GetRepositoryPath(taskMsg.RepositoryName)
 	log.Printf("Starting PR creation process for task: %s", taskMsg.Tasks)
 	log.Printf("Using actual working directory: %s", actualWorkingDir)
 
