@@ -194,11 +194,45 @@ func (p *PRCreator) ensureChangesPushed(branchName string) error {
 func (p *PRCreator) pushBranch(branchName string) error {
 	log.Printf("Pushing branch to GitHub: %s", branchName)
 
+	// Get GitHub token from environment
+	githubToken := os.Getenv("GITHUB_TOKEN")
+
+	// Temporarily set remote URL with token for authenticated push
+	var originalRemoteURL string
+	if githubToken != "" {
+		// Get current remote URL
+		getRemoteCmd := exec.Command("git", "remote", "get-url", "origin")
+		getRemoteCmd.Dir = p.workingDir
+		remoteURLBytes, err := getRemoteCmd.CombinedOutput()
+		if err == nil {
+			originalRemoteURL = strings.TrimSpace(string(remoteURLBytes))
+
+			// Set remote URL with token
+			authenticatedURL := strings.Replace(originalRemoteURL, "https://", fmt.Sprintf("https://x-access-token:%s@", githubToken), 1)
+			setRemoteCmd := exec.Command("git", "remote", "set-url", "origin", authenticatedURL)
+			setRemoteCmd.Dir = p.workingDir
+			if output, err := setRemoteCmd.CombinedOutput(); err != nil {
+				log.Printf("Warning: Failed to set authenticated remote URL: %v\nOutput: %s", err, string(output))
+			}
+		}
+	}
+
 	cmd := exec.Command("git", "push", "--set-upstream", "origin", branchName)
 	cmd.Dir = p.workingDir
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to push branch %s: %w", branchName, err)
+	output, err := cmd.CombinedOutput()
+
+	// Restore original remote URL if we changed it
+	if originalRemoteURL != "" && githubToken != "" {
+		restoreCmd := exec.Command("git", "remote", "set-url", "origin", originalRemoteURL)
+		restoreCmd.Dir = p.workingDir
+		if restoreOutput, restoreErr := restoreCmd.CombinedOutput(); restoreErr != nil {
+			log.Printf("Warning: Failed to restore original remote URL: %v\nOutput: %s", restoreErr, string(restoreOutput))
+		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to push branch %s: %w\nOutput: %s", branchName, err, string(output))
 	}
 
 	log.Printf("Pushed branch to GitHub: %s", branchName)
