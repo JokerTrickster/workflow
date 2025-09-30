@@ -84,10 +84,10 @@ func (c *ClaudeProvider) ExecuteTask(ctx context.Context, request *AITaskRequest
 		}, nil
 	}
 
-	// Auto-commit and push changes if this is a repository task
+	// Ensure changes are committed and pushed (fallback if Claude didn't do it)
 	if request.RepositoryName != "" && result.Success {
-		if err := c.autoCommitAndPush(ctx, workingDir, request); err != nil {
-			log.Printf("Warning: Auto-commit and push failed: %v", err)
+		if err := c.ensureCommitAndPush(ctx, workingDir, request); err != nil {
+			log.Printf("Warning: Failed to ensure commit and push: %v", err)
 			// Don't fail the task, just log the warning
 		}
 	}
@@ -461,49 +461,13 @@ func (c *ClaudeProvider) createWorkingBranch(ctx context.Context, workingDir, br
 	return nil
 }
 
-// autoCommitAndPush automatically commits and pushes changes after task completion
-func (c *ClaudeProvider) autoCommitAndPush(ctx context.Context, workingDir string, request *AITaskRequest) error {
-	// Check if there are any changes to commit
-	statusCmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
-	statusCmd.Dir = workingDir
-	statusOutput, err := statusCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to check git status: %w", err)
-	}
-
-	// If no changes, skip commit
-	if len(strings.TrimSpace(string(statusOutput))) == 0 {
-		log.Printf("No changes to commit in %s", workingDir)
-		return nil
-	}
-
-	log.Printf("Found uncommitted changes, auto-committing...")
-
-	// Stage all changes
-	addCmd := exec.CommandContext(ctx, "git", "add", ".")
-	addCmd.Dir = workingDir
-	if output, err := addCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to stage changes: %w\nOutput: %s", err, string(output))
-	}
-
-	// Create commit message
-	commitMsg := fmt.Sprintf("feat: %s\n\n🤖 Auto-committed by Claude AI", request.Tasks)
-
-	// Commit changes
-	commitCmd := exec.CommandContext(ctx, "git", "commit", "-m", commitMsg)
-	commitCmd.Dir = workingDir
-	if output, err := commitCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to commit changes: %w\nOutput: %s", err, string(output))
-	}
-
-	log.Printf("Successfully committed changes")
-
-	// Push changes to remote
+// ensureCommitAndPush ensures changes are committed and pushed (only if Claude didn't already do it)
+func (c *ClaudeProvider) ensureCommitAndPush(ctx context.Context, workingDir string, request *AITaskRequest) error {
+	// Get current branch name
 	var branchName string
 	if request.BranchName != "" {
 		branchName = request.BranchName
 	} else {
-		// Get current branch name
 		branchCmd := exec.CommandContext(ctx, "git", "branch", "--show-current")
 		branchCmd.Dir = workingDir
 		branchOutput, err := branchCmd.CombinedOutput()
@@ -513,19 +477,70 @@ func (c *ClaudeProvider) autoCommitAndPush(ctx context.Context, workingDir strin
 		branchName = strings.TrimSpace(string(branchOutput))
 	}
 
-	log.Printf("Pushing branch %s to remote...", branchName)
+	// Check if branch exists on remote
+	checkRemoteCmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", "origin", branchName)
+	checkRemoteCmd.Dir = workingDir
+	remoteOutput, _ := checkRemoteCmd.CombinedOutput()
 
-	// Push with timeout
-	pushCtx, pushCancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer pushCancel()
+	branchExistsOnRemote := len(strings.TrimSpace(string(remoteOutput))) > 0
 
-	pushCmd := exec.CommandContext(pushCtx, "git", "push", "--set-upstream", "origin", branchName)
-	pushCmd.Dir = workingDir
-	if output, err := pushCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to push branch %s: %w\nOutput: %s", branchName, err, string(output))
+	// Check if there are uncommitted changes
+	statusCmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
+	statusCmd.Dir = workingDir
+	statusOutput, err := statusCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to check git status: %w", err)
 	}
 
-	log.Printf("Successfully pushed branch %s to remote", branchName)
+	hasUncommittedChanges := len(strings.TrimSpace(string(statusOutput))) > 0
+
+	// If no uncommitted changes and branch exists on remote, we're done
+	if !hasUncommittedChanges && branchExistsOnRemote {
+		log.Printf("Branch %s is already committed and pushed, skipping", branchName)
+		return nil
+	}
+
+	// Commit if there are uncommitted changes
+	if hasUncommittedChanges {
+		log.Printf("Found uncommitted changes, committing...")
+
+		// Stage all changes
+		addCmd := exec.CommandContext(ctx, "git", "add", ".")
+		addCmd.Dir = workingDir
+		if output, err := addCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to stage changes: %w\nOutput: %s", err, string(output))
+		}
+
+		// Create commit message
+		commitMsg := fmt.Sprintf("feat: %s\n\n🤖 Auto-committed by workflow system", request.Tasks)
+
+		// Commit changes
+		commitCmd := exec.CommandContext(ctx, "git", "commit", "-m", commitMsg)
+		commitCmd.Dir = workingDir
+		if output, err := commitCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to commit changes: %w\nOutput: %s", err, string(output))
+		}
+
+		log.Printf("Successfully committed changes")
+	}
+
+	// Push if branch doesn't exist on remote or if we just committed
+	if !branchExistsOnRemote || hasUncommittedChanges {
+		log.Printf("Pushing branch %s to remote...", branchName)
+
+		// Push with timeout
+		pushCtx, pushCancel := context.WithTimeout(ctx, 3*time.Minute)
+		defer pushCancel()
+
+		pushCmd := exec.CommandContext(pushCtx, "git", "push", "--set-upstream", "origin", branchName)
+		pushCmd.Dir = workingDir
+		if output, err := pushCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to push branch %s: %w\nOutput: %s", branchName, err, string(output))
+		}
+
+		log.Printf("Successfully pushed branch %s to remote", branchName)
+	}
+
 	return nil
 }
 
