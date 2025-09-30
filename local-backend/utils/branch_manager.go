@@ -104,23 +104,9 @@ func (bm *BranchManager) CreateTaskBranch(ctx context.Context, taskMsg *TaskMess
 
 // generateUniqueBranchName creates a unique branch name with conflict prevention
 func (bm *BranchManager) generateUniqueBranchName(taskMsg *TaskMessage) string {
-	// Create a hash of the task content for uniqueness
-	hasher := sha256.New()
-	hasher.Write([]byte(taskMsg.Tasks))
-	hasher.Write([]byte(taskMsg.RepositoryName))
-	hasher.Write([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
-
-	hash := fmt.Sprintf("%x", hasher.Sum(nil))[:8]
-
-	// Sanitize task description for branch name
-	sanitizedTask := bm.sanitizeForBranchName(taskMsg.Tasks)
-	if len(sanitizedTask) > 30 {
-		sanitizedTask = sanitizedTask[:30]
-	}
-
-	timestamp := time.Now().Format("0102-1504") // MMDD-HHMM
-
-	return fmt.Sprintf("task/%s-%s-%s", sanitizedTask, timestamp, hash)
+	// Use simple timestamp-based naming to match Claude CLI's working branch format
+	timestamp := time.Now().Unix()
+	return fmt.Sprintf("claude-task-%d", timestamp)
 }
 
 // sanitizeForBranchName removes invalid characters from branch names

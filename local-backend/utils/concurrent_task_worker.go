@@ -204,8 +204,8 @@ func (w *ConcurrentTaskWorker) handleMessageConcurrent(ctx context.Context, msg 
 		// Continue with task execution on current branch
 	}
 
-	// Execute task
-	result, err := w.executeTaskConcurrent(ctx, &taskMsg)
+	// Execute task with branch info
+	result, err := w.executeTaskConcurrent(ctx, &taskMsg, branchInfo)
 	if err != nil {
 		log.Printf("Failed to execute task: %v", err)
 
@@ -282,7 +282,7 @@ func (w *ConcurrentTaskWorker) handleMessageConcurrent(ctx context.Context, msg 
 }
 
 // executeTaskConcurrent safely executes tasks with thread-safe failure tracking
-func (w *ConcurrentTaskWorker) executeTaskConcurrent(ctx context.Context, taskMsg *TaskMessage) (*AITaskResponse, error) {
+func (w *ConcurrentTaskWorker) executeTaskConcurrent(ctx context.Context, taskMsg *TaskMessage, branchInfo *BranchInfo) (*AITaskResponse, error) {
 	log.Printf("Executing task with provider: %s (concurrent)", taskMsg.Provider)
 
 	// Thread-safe failure count check and update
@@ -326,7 +326,7 @@ func (w *ConcurrentTaskWorker) executeTaskConcurrent(ctx context.Context, taskMs
 		return nil, fmt.Errorf("provider %s is not properly configured", taskMsg.Provider)
 	}
 
-	// Convert and execute
+	// Convert and execute with pre-created branch name
 	request := &AITaskRequest{
 		Tasks:          taskMsg.Tasks,
 		RepositoryName: taskMsg.RepositoryName,
@@ -336,6 +336,12 @@ func (w *ConcurrentTaskWorker) executeTaskConcurrent(ctx context.Context, taskMs
 		ContinueTask:   taskMsg.ContinueTask,
 		Timeout:        30 * time.Minute,
 		Options:        make(map[string]interface{}),
+	}
+
+	// Add branch name if available
+	if branchInfo != nil && branchInfo.Name != "" {
+		request.BranchName = branchInfo.Name
+		log.Printf("Using pre-created branch for task execution: %s", branchInfo.Name)
 	}
 
 	taskCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)

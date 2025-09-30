@@ -25,6 +25,7 @@ type AITaskRequest struct {
 	// Repository information
 	RepositoryName string `json:"repository_name"`
 	WorkingDir     string `json:"working_dir"`
+	BranchName     string `json:"branch_name,omitempty"` // Pre-created branch name
 
 	// Execution options
 	Interactive  bool   `json:"interactive"`

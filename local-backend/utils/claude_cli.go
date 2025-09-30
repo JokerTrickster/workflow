@@ -84,6 +84,14 @@ func (c *ClaudeProvider) ExecuteTask(ctx context.Context, request *AITaskRequest
 		}, nil
 	}
 
+	// Auto-commit and push changes if this is a repository task
+	if request.RepositoryName != "" && result.Success {
+		if err := c.autoCommitAndPush(ctx, workingDir, request); err != nil {
+			log.Printf("Warning: Auto-commit and push failed: %v", err)
+			// Don't fail the task, just log the warning
+		}
+	}
+
 	return &AITaskResponse{
 		Content:       result.Output,
 		Success:       result.Success,
@@ -295,7 +303,7 @@ func (c *ClaudeProvider) GetClaudeVersion() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// prepareRepositoryWorkspace uses existing local repository and creates working branch
+// prepareRepositoryWorkspace uses existing local repository and checks out to pre-created branch
 func (c *ClaudeProvider) prepareRepositoryWorkspace(ctx context.Context, request *AITaskRequest) (string, error) {
 	// If no repository name, use fallback directory logic
 	if request.RepositoryName == "" {
@@ -323,17 +331,25 @@ func (c *ClaudeProvider) prepareRepositoryWorkspace(ctx context.Context, request
 		return "", fmt.Errorf("repository validation failed: %w", err)
 	}
 
-	// Ensure repository is up to date
-	if err := c.updateRepository(ctx, repositoryDir); err != nil {
-		return "", fmt.Errorf("failed to update repository: %w", err)
-	}
+	// If branch name is provided (pre-created by BranchManager), just checkout to it
+	if request.BranchName != "" {
+		log.Printf("Using pre-created branch: %s", request.BranchName)
+		if err := c.checkoutBranch(ctx, repositoryDir, request.BranchName); err != nil {
+			return "", fmt.Errorf("failed to checkout pre-created branch %s: %w", request.BranchName, err)
+		}
+	} else {
+		// Fallback: Ensure repository is up to date and create new branch
+		if err := c.updateRepository(ctx, repositoryDir); err != nil {
+			return "", fmt.Errorf("failed to update repository: %w", err)
+		}
 
-	// Create and checkout a working branch
-	timestamp := time.Now().Unix()
-	branchName := fmt.Sprintf("claude-task-%d", timestamp)
-	if err := c.createWorkingBranch(ctx, repositoryDir, branchName); err != nil {
-		log.Printf("Warning: failed to create branch %s: %v", branchName, err)
-		// Continue with current branch if branch creation fails
+		// Create and checkout a working branch
+		timestamp := time.Now().Unix()
+		branchName := fmt.Sprintf("claude-task-%d", timestamp)
+		if err := c.createWorkingBranch(ctx, repositoryDir, branchName); err != nil {
+			log.Printf("Warning: failed to create branch %s: %v", branchName, err)
+			// Continue with current branch if branch creation fails
+		}
 	}
 
 	return repositoryDir, nil
@@ -413,6 +429,22 @@ func (c *ClaudeProvider) cloneRepository(ctx context.Context, repositoryName, ta
 	return nil
 }
 
+// checkoutBranch checks out to an existing branch
+func (c *ClaudeProvider) checkoutBranch(ctx context.Context, workingDir, branchName string) error {
+	log.Printf("Checking out to existing branch: %s", branchName)
+
+	cmd := exec.CommandContext(ctx, "git", "checkout", branchName)
+	cmd.Dir = workingDir
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to checkout branch %s: %w\nOutput: %s", branchName, err, string(output))
+	}
+
+	log.Printf("Successfully checked out to branch: %s", branchName)
+	return nil
+}
+
 // createWorkingBranch creates and checks out a new branch
 func (c *ClaudeProvider) createWorkingBranch(ctx context.Context, workingDir, branchName string) error {
 	log.Printf("Creating working branch: %s", branchName)
@@ -426,6 +458,74 @@ func (c *ClaudeProvider) createWorkingBranch(ctx context.Context, workingDir, br
 	}
 
 	log.Printf("Successfully created and switched to branch: %s", branchName)
+	return nil
+}
+
+// autoCommitAndPush automatically commits and pushes changes after task completion
+func (c *ClaudeProvider) autoCommitAndPush(ctx context.Context, workingDir string, request *AITaskRequest) error {
+	// Check if there are any changes to commit
+	statusCmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
+	statusCmd.Dir = workingDir
+	statusOutput, err := statusCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to check git status: %w", err)
+	}
+
+	// If no changes, skip commit
+	if len(strings.TrimSpace(string(statusOutput))) == 0 {
+		log.Printf("No changes to commit in %s", workingDir)
+		return nil
+	}
+
+	log.Printf("Found uncommitted changes, auto-committing...")
+
+	// Stage all changes
+	addCmd := exec.CommandContext(ctx, "git", "add", ".")
+	addCmd.Dir = workingDir
+	if output, err := addCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to stage changes: %w\nOutput: %s", err, string(output))
+	}
+
+	// Create commit message
+	commitMsg := fmt.Sprintf("feat: %s\n\n🤖 Auto-committed by Claude AI", request.Tasks)
+
+	// Commit changes
+	commitCmd := exec.CommandContext(ctx, "git", "commit", "-m", commitMsg)
+	commitCmd.Dir = workingDir
+	if output, err := commitCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to commit changes: %w\nOutput: %s", err, string(output))
+	}
+
+	log.Printf("Successfully committed changes")
+
+	// Push changes to remote
+	var branchName string
+	if request.BranchName != "" {
+		branchName = request.BranchName
+	} else {
+		// Get current branch name
+		branchCmd := exec.CommandContext(ctx, "git", "branch", "--show-current")
+		branchCmd.Dir = workingDir
+		branchOutput, err := branchCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to get current branch: %w", err)
+		}
+		branchName = strings.TrimSpace(string(branchOutput))
+	}
+
+	log.Printf("Pushing branch %s to remote...", branchName)
+
+	// Push with timeout
+	pushCtx, pushCancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer pushCancel()
+
+	pushCmd := exec.CommandContext(pushCtx, "git", "push", "--set-upstream", "origin", branchName)
+	pushCmd.Dir = workingDir
+	if output, err := pushCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to push branch %s: %w\nOutput: %s", branchName, err, string(output))
+	}
+
+	log.Printf("Successfully pushed branch %s to remote", branchName)
 	return nil
 }
 
