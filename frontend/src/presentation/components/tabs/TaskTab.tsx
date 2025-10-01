@@ -99,17 +99,38 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
         console.log('✅ Tasks loaded from backend:', apiResult.tasks?.length || 0);
 
         // Convert backend task format to frontend task format
-        const convertedTasks: Task[] = (apiResult.tasks || []).map((backendTask: any) => ({
-          id: backendTask.request_id,
-          title: backendTask.tasks.split('\n')[0] || 'Untitled Task',
-          description: backendTask.tasks,
-          status: backendTask.status,
-          repository: backendTask.repository_name,
-          epic: 'backend-tasks',
-          branch: backendTask.working_dir || undefined,
-          created_at: backendTask.created_at,
-          updated_at: backendTask.updated_at
-        }));
+        const convertedTasks: Task[] = (apiResult.tasks || []).map((backendTask: any) => {
+          // Parse title and description from tasks field
+          const tasksContent = backendTask.tasks || '';
+          let title = 'Untitled Task';
+          let description = tasksContent;
+
+          // If tasks starts with markdown heading (# Title), extract it
+          if (tasksContent.startsWith('# ')) {
+            const lines = tasksContent.split('\n');
+            title = lines[0].replace(/^#\s*/, '').trim();
+            // Description is everything after the first line
+            description = lines.slice(1).join('\n').trim();
+          } else {
+            // Use first line as title
+            const firstLine = tasksContent.split('\n')[0]?.trim();
+            if (firstLine) {
+              title = firstLine.length > 100 ? firstLine.substring(0, 100) + '...' : firstLine;
+            }
+          }
+
+          return {
+            id: backendTask.request_id,
+            title,
+            description,
+            status: backendTask.status,
+            repository: backendTask.repository_name,
+            epic: 'backend-tasks',
+            branch: backendTask.working_dir || undefined,
+            created_at: backendTask.created_at,
+            updated_at: backendTask.updated_at
+          };
+        });
 
         setTasks(convertedTasks);
         console.log(`Loaded ${convertedTasks.length} tasks from backend for repository: ${repository.name}`);
@@ -264,8 +285,11 @@ ${selectedGitHubIssue ? `## GitHub Issue
 Task created on ${new Date().toISOString()}`;
 
       // Create task via backend API (correct format)
+      // Combine title and description in tasks field with markdown format
+      const fullTaskDescription = `# ${taskData.title}\n\n${taskData.description}`;
+
       const taskCreateRequest = {
-        tasks: taskData.description, // Main task description
+        tasks: fullTaskDescription, // Title + description in markdown format
         repository_name: repository.name,
         working_dir: `JokerTrickster/${repository.name}`, // Repository path for actual work
         branch_name: taskData.branch_name || '', // User input for branch name
