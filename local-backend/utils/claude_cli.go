@@ -537,27 +537,34 @@ func (c *ClaudeProvider) ensureCommitAndPush(ctx context.Context, workingDir str
 
 		// Get GitHub token from environment
 		githubToken := os.Getenv("GITHUB_TOKEN")
+		log.Printf("GITHUB_TOKEN check: present=%t, length=%d", githubToken != "", len(githubToken))
 		if githubToken == "" {
-			log.Printf("Warning: GITHUB_TOKEN not set, push may fail for private repositories")
+			log.Printf("ERROR: GITHUB_TOKEN not set! Push will fail for private repositories")
+			return fmt.Errorf("GITHUB_TOKEN environment variable is not set")
 		}
 
 		// Temporarily set remote URL with token for authenticated push
 		var originalRemoteURL string
-		if githubToken != "" {
-			// Get current remote URL
-			getRemoteCmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
-			getRemoteCmd.Dir = workingDir
-			remoteURLBytes, err := getRemoteCmd.CombinedOutput()
-			if err == nil {
-				originalRemoteURL = strings.TrimSpace(string(remoteURLBytes))
+		// Get current remote URL
+		getRemoteCmd := exec.CommandContext(ctx, "git", "remote", "get-url", "origin")
+		getRemoteCmd.Dir = workingDir
+		remoteURLBytes, err := getRemoteCmd.CombinedOutput()
+		if err != nil {
+			log.Printf("ERROR: Failed to get remote URL: %v", err)
+		} else {
+			originalRemoteURL = strings.TrimSpace(string(remoteURLBytes))
+			log.Printf("Original remote URL: %s", originalRemoteURL)
 
-				// Set remote URL with token
-				authenticatedURL := strings.Replace(originalRemoteURL, "https://", fmt.Sprintf("https://x-access-token:%s@", githubToken), 1)
-				setRemoteCmd := exec.CommandContext(ctx, "git", "remote", "set-url", "origin", authenticatedURL)
-				setRemoteCmd.Dir = workingDir
-				if output, err := setRemoteCmd.CombinedOutput(); err != nil {
-					log.Printf("Warning: Failed to set authenticated remote URL: %v\nOutput: %s", err, string(output))
-				}
+			// Set remote URL with token
+			authenticatedURL := strings.Replace(originalRemoteURL, "https://", fmt.Sprintf("https://x-access-token:%s@", githubToken), 1)
+			log.Printf("Setting authenticated URL (token hidden)")
+
+			setRemoteCmd := exec.CommandContext(ctx, "git", "remote", "set-url", "origin", authenticatedURL)
+			setRemoteCmd.Dir = workingDir
+			if output, err := setRemoteCmd.CombinedOutput(); err != nil {
+				log.Printf("ERROR: Failed to set authenticated remote URL: %v\nOutput: %s", err, string(output))
+			} else {
+				log.Printf("Successfully set authenticated remote URL")
 			}
 		}
 
@@ -570,11 +577,14 @@ func (c *ClaudeProvider) ensureCommitAndPush(ctx context.Context, workingDir str
 		output, err := pushCmd.CombinedOutput()
 
 		// Restore original remote URL if we changed it
-		if originalRemoteURL != "" && githubToken != "" {
+		if originalRemoteURL != "" {
+			log.Printf("Restoring original remote URL")
 			restoreCmd := exec.Command("git", "remote", "set-url", "origin", originalRemoteURL)
 			restoreCmd.Dir = workingDir
 			if restoreOutput, restoreErr := restoreCmd.CombinedOutput(); restoreErr != nil {
-				log.Printf("Warning: Failed to restore original remote URL: %v\nOutput: %s", restoreErr, string(restoreOutput))
+				log.Printf("ERROR: Failed to restore original remote URL: %v\nOutput: %s", restoreErr, string(restoreOutput))
+			} else {
+				log.Printf("Successfully restored original remote URL")
 			}
 		}
 
