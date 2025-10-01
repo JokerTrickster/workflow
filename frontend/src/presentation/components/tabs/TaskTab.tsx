@@ -572,37 +572,43 @@ Task created on ${new Date().toISOString()}`;
     <div className="space-y-4 h-full flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h3 className="text-lg font-semibold">Local Tasks</h3>
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              New Task
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>
-                {selectedGitHubIssue || selectedGitHubPR ? 'Create Task from GitHub' : 'Create New Task'}
-              </DialogTitle>
-              <DialogDescription>
-                {selectedGitHubIssue || selectedGitHubPR 
-                  ? 'Create a local task based on the selected GitHub item.'
-                  : 'Create a new task for the AI agent to work on.'
-                }
-              </DialogDescription>
-            </DialogHeader>
-            <div className="pt-4">
-              <TaskCreationForm
-                repositoryId={repository.id}
-                onSubmit={handleCreateTask}
-                onCancel={handleCancelTaskCreation}
-                githubIssue={selectedGitHubIssue}
-                githubPullRequest={selectedGitHubPR}
-                isSubmitting={isCreatingTask}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={loadTasks} disabled={isLoadingTasks}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingTasks ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                New Task
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedGitHubIssue || selectedGitHubPR ? 'Create Task from GitHub' : 'Create New Task'}
+                </DialogTitle>
+                <DialogDescription>
+                  {selectedGitHubIssue || selectedGitHubPR
+                    ? 'Create a local task based on the selected GitHub item.'
+                    : 'Create a new task for the AI agent to work on.'
+                  }
+                </DialogDescription>
+              </DialogHeader>
+              <div className="pt-4">
+                <TaskCreationForm
+                  repositoryId={repository.id}
+                  onSubmit={handleCreateTask}
+                  onCancel={handleCancelTaskCreation}
+                  githubIssue={selectedGitHubIssue}
+                  githubPullRequest={selectedGitHubPR}
+                  isSubmitting={isCreatingTask}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {isLoadingTasks ? (
