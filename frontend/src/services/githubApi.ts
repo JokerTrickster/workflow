@@ -34,16 +34,25 @@ export class GitHubApiService {
     }
 
     if (!session?.provider_token) {
-      console.error('❌ No GitHub access token found in session');
-      console.log('Session data:', { 
-        user: session.user?.email, 
+      console.warn('⚠️ No GitHub OAuth token found in session, using fallback token');
+      console.log('Session data:', {
+        user: session.user?.email,
         expires_at: session.expires_at,
-        provider_token: !!session.provider_token 
+        provider_token: !!session.provider_token
       });
+
+      // Fallback to environment variable token (for development)
+      const fallbackToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
+      if (fallbackToken) {
+        console.log('✅ Using fallback GitHub Personal Access Token');
+        return fallbackToken;
+      }
+
+      console.error('❌ No GitHub token available (neither OAuth nor fallback)');
       return null;
     }
 
-    console.log('✅ GitHub access token found');
+    console.log('✅ GitHub OAuth token found');
     return session.provider_token ?? null;
   }
 
