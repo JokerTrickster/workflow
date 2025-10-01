@@ -160,18 +160,40 @@ export function TaskTab({ repository, activeTab }: TaskTabProps) {
   // Handle task detail viewing
   const handleTaskClick = async (task: Task) => {
     try {
-      // Get full task file content
-      const taskFile = await taskFileManager.getTaskFile(task.id, repository.name);
-      if (taskFile) {
-        setSelectedTask({
-          ...task,
-          description: taskFile.content // Use full content instead of truncated description
-        });
-        setShowTaskDetailDialog(true);
+      // Fetch full task details from backend API
+      const response = await fetch(apiConfig.endpoints.tasks.list(repository.name));
+
+      if (response.ok) {
+        const result = await response.json();
+        const fullTask = result.tasks?.find((t: any) => t.request_id === task.id);
+
+        if (fullTask) {
+          // Parse full tasks content for modal display
+          const tasksContent = fullTask.tasks || '';
+          let modalDescription = tasksContent;
+
+          // If tasks starts with markdown heading, remove it for display
+          if (tasksContent.startsWith('# ')) {
+            const lines = tasksContent.split('\n');
+            // Skip first line (title) and show rest as description
+            modalDescription = lines.slice(1).join('\n').trim();
+          }
+
+          setSelectedTask({
+            ...task,
+            description: modalDescription || task.description
+          });
+        } else {
+          setSelectedTask(task);
+        }
+      } else {
+        setSelectedTask(task);
       }
+
+      setShowTaskDetailDialog(true);
     } catch (error) {
       console.error('Failed to load task details:', error);
-      // Still show basic task info if file loading fails
+      // Still show basic task info if loading fails
       setSelectedTask(task);
       setShowTaskDetailDialog(true);
     }
