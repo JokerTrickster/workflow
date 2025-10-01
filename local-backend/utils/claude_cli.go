@@ -526,7 +526,8 @@ func (c *ClaudeProvider) ensureCommitAndPush(ctx context.Context, workingDir str
 
 	// Push if branch doesn't exist on remote or if we just committed
 	if !branchExistsOnRemote || hasUncommittedChanges {
-		log.Printf("Pushing branch %s to remote...", branchName)
+		log.Printf("Pushing branch %s to remote... (exists on remote: %t, has uncommitted: %t)",
+			branchName, branchExistsOnRemote, hasUncommittedChanges)
 
 		// Get GitHub token from environment
 		githubToken := os.Getenv("GITHUB_TOKEN")
@@ -572,10 +573,14 @@ func (c *ClaudeProvider) ensureCommitAndPush(ctx context.Context, workingDir str
 		}
 
 		if err != nil {
+			log.Printf("ERROR: Failed to push branch %s: %v\nOutput: %s", branchName, err, string(output))
 			return fmt.Errorf("failed to push branch %s: %w\nOutput: %s", branchName, err, string(output))
 		}
 
-		log.Printf("Successfully pushed branch %s to remote", branchName)
+		log.Printf("✅ Successfully pushed branch %s to remote", branchName)
+	} else {
+		log.Printf("Skipping push: branch exists on remote (%t) and no uncommitted changes (%t)",
+			branchExistsOnRemote, !hasUncommittedChanges)
 	}
 
 	return nil
