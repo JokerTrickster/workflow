@@ -85,11 +85,15 @@ func (c *ClaudeProvider) ExecuteTask(ctx context.Context, request *AITaskRequest
 	}
 
 	// Ensure changes are committed and pushed (fallback if Claude didn't do it)
+	log.Printf("Checking if ensureCommitAndPush should run: RepositoryName='%s', Success=%t", request.RepositoryName, result.Success)
 	if request.RepositoryName != "" && result.Success {
+		log.Printf("Calling ensureCommitAndPush...")
 		if err := c.ensureCommitAndPush(ctx, workingDir, request); err != nil {
 			log.Printf("Warning: Failed to ensure commit and push: %v", err)
 			// Don't fail the task, just log the warning
 		}
+	} else {
+		log.Printf("Skipping ensureCommitAndPush: RepositoryName empty or task failed")
 	}
 
 	return &AITaskResponse{
@@ -463,6 +467,8 @@ func (c *ClaudeProvider) createWorkingBranch(ctx context.Context, workingDir, br
 
 // ensureCommitAndPush ensures changes are committed and pushed (only if Claude didn't already do it)
 func (c *ClaudeProvider) ensureCommitAndPush(ctx context.Context, workingDir string, request *AITaskRequest) error {
+	log.Printf("🔍 ensureCommitAndPush called for repository: %s, workingDir: %s", request.RepositoryName, workingDir)
+
 	// Get current branch name
 	var branchName string
 	if request.BranchName != "" {
