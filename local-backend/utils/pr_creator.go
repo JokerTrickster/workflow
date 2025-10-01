@@ -53,18 +53,7 @@ func (p *PRCreator) CreatePRForCompletedTaskWithIssue(ctx context.Context, taskM
 		return fmt.Errorf("failed to change to working directory: %w", err)
 	}
 
-	// Step 3: Check Git status and ensure we have changes
-	hasChanges, err := p.checkForChanges()
-	if err != nil {
-		return fmt.Errorf("failed to check for changes: %w", err)
-	}
-
-	if !hasChanges {
-		log.Printf("No changes detected, skipping PR creation for task: %s", taskMsg.Tasks)
-		return nil
-	}
-
-	// Step 4: Get current branch name
+	// Step 3: Get current branch name
 	branchName, err := p.getCurrentBranch()
 	if err != nil {
 		return fmt.Errorf("failed to get current branch: %w", err)
@@ -72,10 +61,29 @@ func (p *PRCreator) CreatePRForCompletedTaskWithIssue(ctx context.Context, taskM
 
 	log.Printf("Current branch: %s", branchName)
 
-	// Step 5: Ensure changes are committed and pushed
+	// Step 4: Ensure changes are committed and pushed
 	if err := p.ensureChangesPushed(branchName); err != nil {
 		return fmt.Errorf("failed to ensure changes are pushed: %w", err)
 	}
+
+	// Step 5: Check if branch has commits different from base branch
+	defaultBranch, err := p.getDefaultBranch()
+	if err != nil {
+		log.Printf("Warning: failed to get default branch, using 'main': %v", err)
+		defaultBranch = "main"
+	}
+
+	hasCommits, err := p.checkBranchHasCommits(branchName, defaultBranch)
+	if err != nil {
+		return fmt.Errorf("failed to check branch commits: %w", err)
+	}
+
+	if !hasCommits {
+		log.Printf("Branch %s has no commits different from %s, skipping PR creation", branchName, defaultBranch)
+		return nil
+	}
+
+	log.Printf("Branch %s has commits ahead of %s, proceeding with PR creation", branchName, defaultBranch)
 
 	// Step 6: Create GitHub Pull Request
 	prURL, err := p.createGitHubPRWithIssue(taskMsg, branchName, result, issueNumber)
@@ -139,6 +147,25 @@ func (p *PRCreator) checkForChanges() (bool, error) {
 	log.Printf("Git status check - has changes: %t", hasChanges)
 
 	return hasChanges, nil
+}
+
+// checkBranchHasCommits checks if the branch has commits different from the base branch
+func (p *PRCreator) checkBranchHasCommits(branchName, baseBranch string) (bool, error) {
+	// Use git rev-list to count commits in branch that aren't in base
+	cmd := exec.Command("git", "rev-list", "--count", fmt.Sprintf("origin/%s..%s", baseBranch, branchName))
+	cmd.Dir = p.workingDir
+
+	output, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to check branch commits: %w", err)
+	}
+
+	commitCount := strings.TrimSpace(string(output))
+	hasCommits := commitCount != "0"
+
+	log.Printf("Branch %s has %s commits ahead of origin/%s", branchName, commitCount, baseBranch)
+
+	return hasCommits, nil
 }
 
 // getCurrentBranch gets the current Git branch name
