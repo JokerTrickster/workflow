@@ -140,6 +140,27 @@ func (c *ClaudeProvider) buildClaudeCommand(request *AITaskRequest) []string {
 func (c *ClaudeProvider) buildEnhancedPrompt(request *AITaskRequest, originalPrompt string) string {
 	var promptBuilder strings.Builder
 
+	// Load and add project-specific context if available
+	if request.WorkingDir != "" {
+		contextManager := NewProjectContextManager(request.WorkingDir)
+
+		// Ensure .claude directory and default files exist
+		_ = contextManager.EnsureClaudeDirectory()
+		if !contextManager.ProjectContextExists() {
+			_ = contextManager.CreateDefaultProjectContext(request.RepositoryName)
+		}
+		if !contextManager.ProjectRulesExists() {
+			_ = contextManager.CreateDefaultProjectRules(request.RepositoryName)
+		}
+
+		// Add project context to prompt
+		projectContext := contextManager.GetContextForPrompt()
+		if projectContext != "" {
+			promptBuilder.WriteString(projectContext)
+			promptBuilder.WriteString("---\n\n")
+		}
+	}
+
 	// Add explicit permissions and directives at the beginning
 	promptBuilder.WriteString("PERMISSIONS AND DIRECTIVES:\n")
 	promptBuilder.WriteString("- You have FULL permission to create, modify, and delete files in this repository\n")
@@ -148,7 +169,9 @@ func (c *ClaudeProvider) buildEnhancedPrompt(request *AITaskRequest, originalPro
 	promptBuilder.WriteString("- IMPLEMENT the requested changes immediately and completely\n")
 	promptBuilder.WriteString("- CREATE new files when needed for the implementation\n")
 	promptBuilder.WriteString("- MODIFY existing files to implement the requested functionality\n")
-	promptBuilder.WriteString("- DO NOT commit or push changes - the system will handle that automatically\n\n")
+	promptBuilder.WriteString("- DO NOT commit or push changes - the system will handle that automatically\n")
+	promptBuilder.WriteString("- ALWAYS follow the existing codebase patterns and conventions\n")
+	promptBuilder.WriteString("- READ the project context and rules before making changes\n\n")
 
 	// Add repository context if available
 	if request.RepositoryName != "" {
