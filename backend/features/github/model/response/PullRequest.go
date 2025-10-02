@@ -104,3 +104,18 @@ type RequestReviewersRequest struct {
 	Reviewers     []string `json:"reviewers,omitempty"`
 	TeamReviewers []string `json:"team_reviewers,omitempty"`
 }
+
+// MergePullRequestRequest represents the request to merge a GitHub pull request
+type MergePullRequestRequest struct {
+	CommitTitle   string  `json:"commit_title,omitempty"`
+	CommitMessage string  `json:"commit_message,omitempty"`
+	SHA           string  `json:"sha,omitempty"`
+	MergeMethod   string  `json:"merge_method,omitempty"` // merge, squash, or rebase
+}
+
+// MergePullRequestResponse represents the response from merging a pull request
+type MergePullRequestResponse struct {
+	SHA     string `json:"sha"`
+	Merged  bool   `json:"merged"`
+	Message string `json:"message"`
+}

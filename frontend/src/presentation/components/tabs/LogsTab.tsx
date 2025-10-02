@@ -568,24 +568,6 @@ export function LogsTab({ repository }: LogsTabProps) {
                           </div>
                         </div>
                       )}
-                      
-                      {selectedLog.metadata.userAgent && (
-                        <div className="bg-gray-50 p-3 rounded-md">
-                          <div className="text-xs font-medium text-gray-600 mb-1">User Agent</div>
-                          <div className="text-xs text-gray-700 font-mono truncate" title={selectedLog.metadata.userAgent}>
-                            {selectedLog.metadata.userAgent}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {selectedLog.metadata.requestId && (
-                        <div className="bg-gray-50 p-3 rounded-md">
-                          <div className="text-xs font-medium text-gray-600 mb-1">Request ID</div>
-                          <div className="text-xs text-gray-700 font-mono">
-                            {selectedLog.metadata.requestId}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}

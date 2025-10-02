@@ -179,12 +179,12 @@ export class GitHubApiService {
       id: repo.id,
       name: repo.name,
       full_name: repo.full_name,
-      description: repo.description || undefined,
+      description: repo.description || null,
       html_url: repo.html_url,
       clone_url: repo.clone_url,
       ssh_url: repo.ssh_url,
       private: repo.private,
-      language: repo.language || undefined,
+      language: repo.language || null,
       stargazers_count: repo.stargazers_count,
       forks_count: repo.forks_count,
       created_at: repo.created_at,
@@ -455,9 +455,7 @@ export class GitHubApiService {
       }
 
       const comment = await response.json();
-      activityLogger.logGitHubSync(`${repoId}#${issueNumber} comment`, 'completed', { 
-        commentId: comment.id 
-      });
+      activityLogger.logGitHubSync(`${repoId}#${issueNumber} comment`, 'completed');
       
       console.log(`✅ Successfully created comment on ${repoId}#${issueNumber}`);
     } catch (error) {
@@ -487,21 +485,43 @@ export class GitHubApiService {
     try {
       const koreanComment = generateKoreanComment(commentType, variables, customTemplates);
       await this.createIssueComment(repoId, issueNumber, koreanComment);
-      
-      const activityLogger = ActivityLogger.getInstance();
-      activityLogger.logActivity(
-        `GitHub Issue Comment`,
-        `${commentType} comment created on ${repoId}#${issueNumber}`,
-        'success'
-      );
+
+      // Comment created successfully
     } catch (error) {
-      const activityLogger = ActivityLogger.getInstance();
-      activityLogger.logActivity(
-        `GitHub Issue Comment`,
-        `Failed to create ${commentType} comment on ${repoId}#${issueNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'error'
-      );
+      console.error(`Failed to create ${commentType} comment on ${repoId}#${issueNumber}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Merge a pull request via backend proxy
+   * @param owner - Repository owner
+   * @param repo - Repository name
+   * @param pullNumber - Pull request number
+   * @param options - Merge options
+   */
+  static async mergeBackendPullRequest(
+    owner: string,
+    repo: string,
+    pullNumber: number,
+    options: {
+      merge_method?: 'merge' | 'squash' | 'rebase';
+      commit_title?: string;
+      commit_message?: string;
+    }
+  ) {
+    const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/github/repos/${owner}/${repo}/pulls/${pullNumber}/merge`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to merge pull request');
+    }
+
+    return response.json();
   }
 }

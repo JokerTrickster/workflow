@@ -120,14 +120,14 @@ interface TaskStats {
 }
 
 // Helper to filter data by time range
-const filterByTimeRange = (items: { created_at: string }[], timeRange: string): { created_at: string }[] => {
+const filterByTimeRange = <T extends { created_at: string }>(items: T[], timeRange: string): T[] => {
   if (timeRange === 'all') return items;
-  
+
   const now = new Date();
   const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
   const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-  
-  return items.filter((item: { created_at: string }) => new Date(item.created_at) >= cutoff);
+
+  return items.filter((item) => new Date(item.created_at) >= cutoff);
 };
 
 // Helper to calculate task statistics from real task data
@@ -144,14 +144,14 @@ const calculateTaskStats = (tasks: { status: string; created_at: string; complet
   const completionRate = total > 0 ? (completed / total) * 100 : 0;
   
   // Calculate average completion time for completed tasks
-  const completedTasksWithTimes = filteredTasks.filter(t => 
+  const completedTasksWithTimes = filteredTasks.filter(t =>
     t.status === 'completed' && t.completed_at && t.started_at
   );
-  
-  const avgCompletionTime = completedTasksWithTimes.length > 0 
+
+  const avgCompletionTime = completedTasksWithTimes.length > 0
     ? completedTasksWithTimes.reduce((acc, task) => {
-        const start = new Date(task.started_at).getTime();
-        const end = new Date(task.completed_at).getTime();
+        const start = new Date(task.started_at!).getTime();
+        const end = new Date(task.completed_at!).getTime();
         return acc + (end - start) / (1000 * 60 * 60); // hours
       }, 0) / completedTasksWithTimes.length
     : 0;
@@ -291,7 +291,7 @@ export function DashboardTab({ repository }: DashboardTabProps) {
     error: tasksError,
     refetch: refetchTasks
   } = useTasks({
-    repositoryId: repository.id,
+    repositoryName: repository.full_name,
     enabled: true
   });
 
@@ -446,7 +446,7 @@ export function DashboardTab({ repository }: DashboardTabProps) {
     }
   };
 
-  const hasError = issuesError || prsError || tasksError || eventsError;
+  const hasError = !!(issuesError || prsError || tasksError || eventsError);
   const isLoading = issuesLoading || prsLoading || tasksLoading || eventsLoading;
 
   return (
@@ -557,7 +557,7 @@ export function DashboardTab({ repository }: DashboardTabProps) {
           value={isLoading ? '-' : githubStats?.issues.open || 0}
           subtitle={`${githubStats?.issues.allTimeTotal || 0} total`}
           icon={AlertCircle}
-          trend={githubStats?.issues.trend || 'neutral'}
+          trend={(githubStats?.issues.trend || 'neutral') as 'up' | 'down' | 'neutral'}
           color="text-red-500"
           loading={isLoading}
         />
@@ -568,7 +568,7 @@ export function DashboardTab({ repository }: DashboardTabProps) {
           value={isLoading ? '-' : githubStats?.pullRequests.open || 0}
           subtitle={`${githubStats?.pullRequests.mergeRate || 0}% merge rate`}
           icon={GitPullRequest}
-          trend={githubStats?.pullRequests.trend || 'neutral'}
+          trend={(githubStats?.pullRequests.trend || 'neutral') as 'up' | 'down' | 'neutral'}
           color="text-purple-500"
           loading={isLoading}
         />
@@ -1102,16 +1102,11 @@ export function DashboardTab({ repository }: DashboardTabProps) {
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Badge variant={
-                    selectedPR.merged ? 'default' : 
+                    selectedPR.merged ? 'default' :
                     selectedPR.state === 'open' ? 'secondary' : 'outline'
                   }>
                     {selectedPR.merged ? 'merged' : selectedPR.state}
                   </Badge>
-                  {selectedPR.labels?.map((label: any) => (
-                    <Badge key={label.id} variant="outline" style={{ color: `#${label.color}` }}>
-                      {label.name}
-                    </Badge>
-                  ))}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1120,12 +1115,6 @@ export function DashboardTab({ repository }: DashboardTabProps) {
                   </div>
                   <div>
                     <span className="text-muted-foreground">To:</span> {selectedPR.base?.label}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Commits:</span> {selectedPR.commits}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Files changed:</span> {selectedPR.changed_files}
                   </div>
                 </div>
 
@@ -1140,13 +1129,7 @@ export function DashboardTab({ repository }: DashboardTabProps) {
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <MessageSquare className="h-4 w-4" />
-                    {selectedPR.comments} comments
-                  </div>
-                  <div className="flex items-center gap-1 text-green-600">
-                    +{selectedPR.additions} additions
-                  </div>
-                  <div className="flex items-center gap-1 text-red-600">
-                    -{selectedPR.deletions} deletions
+                    View on GitHub for details
                   </div>
                 </div>
 

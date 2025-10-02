@@ -35,21 +35,9 @@ export class PMGitHubIntegrationService {
         'start',
         variables
       );
-      
-      activityLogger.logActivity(
-        'PM Issue Start',
-        `Started work on issue #${issueNumber} with Korean comment`,
-        'success'
-      );
-      
+
       console.log(`✅ Created Korean start comment for issue #${issueNumber}`);
     } catch (error) {
-      activityLogger.logActivity(
-        'PM Issue Start',
-        `Failed to create start comment for issue #${issueNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'error'
-      );
-      
       console.error(`❌ Failed to create Korean start comment for issue #${issueNumber}:`, error);
       throw error;
     }

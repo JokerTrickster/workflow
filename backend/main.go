@@ -5,6 +5,7 @@ import (
 	"log"
 	"main/features"
 	"main/utils"
+	"net/http"
 	"os"
 
 	_ "main/docs"
@@ -37,7 +38,30 @@ func main() {
 	// Add middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
+
+	// Custom CORS middleware
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// Get CORS origin from environment variable
+			origin := os.Getenv("CORS_ORIGIN")
+			if origin == "" {
+				origin = "http://13.203.37.93:4000"
+			}
+
+			c.Response().Header().Set("Access-Control-Allow-Origin", origin)
+			c.Response().Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			c.Response().Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+			c.Response().Header().Set("Access-Control-Allow-Credentials", "true")
+			c.Response().Header().Set("Access-Control-Max-Age", "86400")
+
+			// Handle preflight requests
+			if c.Request().Method == "OPTIONS" {
+				return c.NoContent(http.StatusNoContent)
+			}
+
+			return next(c)
+		}
+	})
 
 	// Handler 초기화
 	if err := features.InitHandler(e); err != nil {

@@ -96,8 +96,9 @@ export function WorkspacePanel({ repository, onClose }: WorkspacePanelProps) {
     };
 
     // Restore tab state for this repository
-    const savedTab = localStorage.getItem(`workspace-tab-${repository.id}`);
-    if (savedTab && ['tasks', 'issues', 'prs'].includes(savedTab)) {
+    const savedTab = localStorage.getItem(`workspace-tab-${repository.id}`) ?? '';
+    const validTabs: string[] = ['tasks', 'issues', 'prs'];
+    if (validTabs.includes(savedTab)) {
       setActiveTab(savedTab);
     }
   }, [repository.id, repository.name]);

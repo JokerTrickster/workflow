@@ -27,8 +27,7 @@ export function useGitHubIssues({ repoId, params = {}, enabled = true }: UseGitH
         // Return empty response instead of throwing to prevent TaskTab crash
         return {
           issues: [],
-          total_count: 0,
-          has_more: false
+          hasMore: false
         };
       }
     },

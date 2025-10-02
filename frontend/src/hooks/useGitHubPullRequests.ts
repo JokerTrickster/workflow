@@ -27,8 +27,7 @@ export function useGitHubPullRequests({ repoId, params = {}, enabled = true }: U
         // Return empty response instead of throwing to prevent TaskTab crash
         return {
           pullRequests: [],
-          total_count: 0,
-          has_more: false
+          hasMore: false
         };
       }
     },

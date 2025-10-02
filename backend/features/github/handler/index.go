@@ -14,6 +14,7 @@ func InitGitHubHandler(e *echo.Echo) *GitHubHandler {
 	githubGroup.GET("/user", githubHandler.GetUser)
 	githubGroup.GET("/repositories", githubHandler.GetRepositories)
 	githubGroup.POST("/sync-repositories", githubHandler.SyncRepositories)
+	githubGroup.PUT("/repos/:owner/:repo/pulls/:number/merge", githubHandler.MergePullRequest)
 
 	return githubHandler
 }

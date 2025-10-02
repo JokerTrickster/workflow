@@ -76,14 +76,14 @@ const createApiConfig = (): ApiConfig => {
         status: (id: number) => `${baseUrl}/repos/${id}/status`,
       },
       workLogs: {
-        list: () => '/api/work-logs',
-        entry: () => '/api/work-logs/entry',
+        list: () => `${baseUrl}/work-logs`,
+        entry: () => `${baseUrl}/work-logs/entry`,
       },
       github: {
         pulls: (owner: string, repo: string, number: number) =>
-          `/api/github/repos/${owner}/${repo}/pulls/${number}`,
+          `${baseUrl}/github/repos/${owner}/${repo}/pulls/${number}`,
         merge: (owner: string, repo: string, number: number) =>
-          `/api/github/repos/${owner}/${repo}/pulls/${number}/merge`,
+          `${baseUrl}/github/repos/${owner}/${repo}/pulls/${number}/merge`,
       },
     },
   };

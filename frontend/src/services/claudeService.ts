@@ -96,7 +96,7 @@ export class ClaudeService {
    */
   async runTasks(request: ReqRunTasksClaude): Promise<ClaudeTaskResponse> {
     try {
-      const response = await apiClient.post<ClaudeTaskResponse>('/tasks', request);
+      const response = await apiClient.post<ClaudeTaskResponse>('/tasks', request as unknown as Record<string, unknown>);
       return response;
     } catch (error) {
       console.error('Failed to submit Claude task:', error);

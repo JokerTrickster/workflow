@@ -3,8 +3,10 @@ package features
 import (
 	"net/http"
 
+	epicTaskHandler "main/features/epic-tasks/handler"
 	githubHandler "main/features/github/handler"
 	taskHandler "main/features/task/handler"
+	workLogHandler "main/features/work-logs/handler"
 
 	"github.com/labstack/echo/v4"
 )
@@ -23,6 +25,12 @@ func InitHandler(e *echo.Echo) error {
 
 	// GitHub handler 초기화
 	githubHandler.InitGitHubHandler(e)
+
+	// Work logs handler 초기화
+	workLogHandler.InitWorkLogHandler(e)
+
+	// Epic tasks handler 초기화
+	epicTaskHandler.InitEpicTaskHandler(e)
 
 	return nil
 }

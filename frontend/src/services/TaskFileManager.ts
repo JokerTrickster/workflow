@@ -16,8 +16,8 @@ export interface TaskFileMetadata {
   tokensUsed: number;
   githubIssue?: number;
   prUrl?: string;
-  buildStatus?: 'pending' | 'success' | 'failure';
-  lintStatus?: 'pending' | 'success' | 'failure';
+  buildStatus?: 'pending' | 'success' | 'failed';
+  lintStatus?: 'pending' | 'success' | 'failed';
 }
 
 export interface TaskFile {

@@ -1407,7 +1407,7 @@ Task created on ${new Date().toISOString()}`;
                       setTasks(prevTasks =>
                         prevTasks.map(task =>
                           task.id === selectedTask.id
-                            ? { ...task, status: 'processing' }
+                            ? { ...task, status: 'in_progress' as const }
                             : task
                         )
                       );
@@ -1429,8 +1429,8 @@ Task created on ${new Date().toISOString()}`;
                 </Button>
               )}
 
-              {/* Processing Task Actions */}
-              {selectedTask.status === 'processing' && (
+              {/* In Progress Task Actions */}
+              {selectedTask.status === 'in_progress' && (
                 <>
                   <Button 
                     variant="destructive"

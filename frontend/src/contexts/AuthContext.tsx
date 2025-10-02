@@ -31,7 +31,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   // Make queryClient optional to prevent errors if QueryClientProvider is not available
-  let queryClient: any = null
+  const queryClient: any = null
   // Comment out useQueryClient for now to prevent build errors
   // try {
   //   queryClient = useQueryClient()

@@ -29,7 +29,7 @@ export interface DailyWorkLog {
 
 export class WorkLogManager {
   private static instance: WorkLogManager;
-  private readonly API_BASE = '/api/work-logs';
+  private readonly API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/work-logs`;
 
   private constructor() {}
 

@@ -120,6 +120,8 @@ export interface TranslationMessages {
     confirm: string;
     yes: string;
     no: string;
+    settings: string;
+    language: string;
   };
   
   // Error messages

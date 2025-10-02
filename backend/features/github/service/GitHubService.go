@@ -440,6 +440,48 @@ func (s *GitHubService) GetPullRequestStatus(ctx context.Context, accessToken, o
 	return &pr, nil
 }
 
+// MergePullRequest merges a pull request
+func (s *GitHubService) MergePullRequest(ctx context.Context, accessToken, owner, repo string, prNumber int, req *response.MergePullRequestRequest) (*response.MergePullRequestResponse, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/merge", owner, repo, prNumber)
+
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal merge request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Authorization", "Bearer "+accessToken)
+	httpReq.Header.Set("Accept", "application/vnd.github.v3+json")
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge pull request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, s.handleGitHubAPIError(resp.StatusCode, body, fmt.Sprintf("merge PR #%d in %s/%s", prNumber, owner, repo))
+	}
+
+	var mergeResp response.MergePullRequestResponse
+	if err := json.Unmarshal(body, &mergeResp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal merge response: %w", err)
+	}
+
+	log.Printf("Successfully merged pull request #%d in %s/%s", prNumber, owner, repo)
+	return &mergeResp, nil
+}
+
 // Template Generation
 
 // GenerateIssueTemplate generates a standardized issue template for tasks
