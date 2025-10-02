@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: workflow-backend
+    restart: always
+    ports:
+      - "7000:7000"
+    environment:
+      - PORT=7000
+      - GIN_MODE=release
+      - RABBITMQ_URL=amqp://board:examplepassword@13.203.37.93:5672/
+      - RABBITMQ_QUEUE_NAME=workflow_queue
+      - RABBITMQ_USERNAME=board
+      - RABBITMQ_PASSWORD=examplepassword
+      - RABBITMQ_HOST=13.203.37.93
+      - RABBITMQ_PORT=5672
+      - DB_HOST=13.203.37.93
+      - DB_PORT=3306
+      - DB_NAME=dev_workflow
+      - DB_USERNAME=root
+      - DB_PASSWORD=examplepassword
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+      - WORKING_DIR=/tmp/claude-tasks
+      - CORS_ORIGIN=http://jokertrickster-workflow.s3-website.ap-south-1.amazonaws.com
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    volumes:
+      - ./logs:/var/log/workflow-backend
+      - /tmp/claude-tasks:/tmp/claude-tasks

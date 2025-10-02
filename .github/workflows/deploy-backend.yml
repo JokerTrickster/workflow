@@ -19,23 +19,12 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: Build backend
-        run: |
-          cd backend
-          go mod download
-          go build -o server main.go
-          echo "✅ Built backend server"
-
       - name: Deploy to EC2
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Setup SSH
           mkdir -p ~/.ssh
@@ -45,30 +34,25 @@ jobs:
 
           echo "🚀 Deploying backend to $EC2_HOST"
 
-          # Copy binary to EC2
-          scp -i ~/.ssh/id_rsa backend/server $EC2_USER@$EC2_HOST:/tmp/server
+          # Copy backend files to EC2
+          scp -i ~/.ssh/id_rsa -r backend $EC2_USER@$EC2_HOST:/tmp/
 
-          # Deploy on EC2
+          # Deploy with Docker
           ssh -i ~/.ssh/id_rsa $EC2_USER@$EC2_HOST << 'EOF'
-            # Stop existing service
-            sudo systemctl stop workflow-backend || true
+            cd /tmp/backend
 
-            # Backup current binary
-            sudo cp /opt/workflow/server /opt/workflow/server.backup.$(date +%Y%m%d-%H%M%S) || true
+            # Stop existing container
+            docker-compose down || true
 
-            # Deploy new binary
-            sudo mkdir -p /opt/workflow
-            sudo mv /tmp/server /opt/workflow/
-            sudo chmod +x /opt/workflow/server
-            sudo chown root:root /opt/workflow/server
+            # Build and start new container
+            GITHUB_TOKEN=$GITHUB_TOKEN docker-compose up -d --build
 
-            # Start service
-            sudo systemctl start workflow-backend
-            sudo systemctl enable workflow-backend
+            # Check container status
+            docker-compose ps
+            docker-compose logs --tail=50
 
-            # Check service status
-            sleep 2
-            sudo systemctl status workflow-backend --no-pager
+            # Cleanup
+            docker image prune -f
           EOF
 
           echo "✅ Backend deployed successfully"
