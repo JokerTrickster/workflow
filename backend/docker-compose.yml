@@ -5,18 +5,17 @@ services:
     build: .
     container_name: workflow-backend
     restart: always
-    ports:
-      - "7000:7000"
+    network_mode: host
     environment:
       - PORT=7000
       - GIN_MODE=release
-      - RABBITMQ_URL=amqp://board:examplepassword@13.203.37.93:5672/
+      - RABBITMQ_URL=amqp://board:examplepassword@localhost:5672/
       - RABBITMQ_QUEUE_NAME=workflow_queue
       - RABBITMQ_USERNAME=board
       - RABBITMQ_PASSWORD=examplepassword
-      - RABBITMQ_HOST=13.203.37.93
+      - RABBITMQ_HOST=localhost
       - RABBITMQ_PORT=5672
-      - DB_HOST=13.203.37.93
+      - DB_HOST=localhost
       - DB_PORT=3306
       - DB_NAME=dev_workflow
       - DB_USERNAME=root
