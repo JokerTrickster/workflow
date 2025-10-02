@@ -75,7 +75,7 @@ func main() {
 	// Get server configuration from environment variables
 	host := os.Getenv("SERVER_HOST")
 	if host == "" {
-		host = "localhost"
+		host = "0.0.0.0"
 	}
 
 	port := os.Getenv("SERVER_PORT")
